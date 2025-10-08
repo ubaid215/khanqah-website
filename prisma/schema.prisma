@@ -1,0 +1,404 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== USER & AUTH ====================
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  username      String?       @unique
+  password      String        // Hashed with bcrypt
+  name          String?
+  image         String?
+  bio           String?
+  role          UserRole      @default(USER)
+  status        AccountStatus @default(ACTIVE)
+  emailVerified DateTime?
+  
+  // Relations
+  enrollments   Enrollment[]
+  progress      LessonProgress[]
+  certificates  Certificate[]
+  questions     Question[]
+  answers       Answer[]
+  bookmarks     Bookmark[]
+  sessions      Session[]
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  lastLoginAt   DateTime?
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+// ==================== COURSES & LMS ====================
+
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Course {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  description     String
+  shortDesc       String?
+  thumbnail       String?
+  level           CourseLevel   @default(BEGINNER)
+  status          CourseStatus  @default(DRAFT)
+  duration        Int?          // Total duration in minutes
+  price           Decimal       @default(0) @db.Decimal(10, 2)
+  isFree          Boolean       @default(true)
+  isPublished     Boolean       @default(false)
+  
+  // Relations
+  categories      CourseCategory[]
+  modules         Module[]
+  enrollments     Enrollment[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  publishedAt     DateTime?
+
+  @@index([slug])
+  @@index([status])
+  @@index([isPublished])
+  @@map("courses")
+}
+
+model Category {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  slug        String           @unique
+  description String?
+  icon        String?
+  
+  courses     CourseCategory[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("categories")
+}
+
+model CourseCategory {
+  courseId    String
+  categoryId  String
+  
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  @@id([courseId, categoryId])
+  @@map("course_categories")
+}
+
+model Module {
+  id          String   @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  order       Int
+  
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([courseId])
+  @@map("modules")
+}
+
+enum LessonType {
+  VIDEO
+  ARTICLE
+  QUIZ
+  ASSIGNMENT
+}
+
+model Lesson {
+  id          String           @id @default(cuid())
+  moduleId    String
+  title       String
+  description String?
+  type        LessonType       @default(VIDEO)
+  content     String?          // Text content or embed code
+  videoUrl    String?
+  duration    Int?             // Duration in seconds
+  order       Int
+  isFree      Boolean          @default(false)
+  
+  module      Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    LessonProgress[]
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([moduleId])
+  @@map("lessons")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+model Enrollment {
+  id              String           @id @default(cuid())
+  userId          String
+  courseId        String
+  status          EnrollmentStatus @default(ACTIVE)
+  progress        Int              @default(0) // Percentage 0-100
+  completedAt     DateTime?
+  
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course          Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  enrolledAt      DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model LessonProgress {
+  id              String    @id @default(cuid())
+  userId          String
+  lessonId        String
+  isCompleted     Boolean   @default(false)
+  watchedDuration Int       @default(0) // Seconds watched
+  lastPosition    Int       @default(0) // Last video position in seconds
+  completedAt     DateTime?
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson          Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+  @@index([lessonId])
+  @@map("lesson_progress")
+}
+
+model Certificate {
+  id          String   @id @default(cuid())
+  userId      String
+  courseId    String
+  courseTitle String
+  issueDate   DateTime @default(now())
+  pdfUrl      String?
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@map("certificates")
+}
+
+// ==================== ARTICLES ====================
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Article {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  content     String        // Rich text content
+  excerpt     String?
+  thumbnail   String?
+  status      ArticleStatus @default(DRAFT)
+  readTime    Int?          // Reading time in minutes
+  views       Int           @default(0)
+  
+  tags        ArticleTag[]
+  bookmarks   Bookmark[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  publishedAt DateTime?
+
+  @@index([slug])
+  @@index([status])
+  @@map("articles")
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  slug     String       @unique
+  
+  articles ArticleTag[]
+  
+  @@map("tags")
+}
+
+model ArticleTag {
+  articleId String
+  tagId     String
+  
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@id([articleId, tagId])
+  @@map("article_tags")
+}
+
+// ==================== BOOKS ====================
+
+enum BookStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Book {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  description String
+  author      String
+  coverImage  String?
+  fileUrl     String?    // PDF URL
+  pages       Int?
+  status      BookStatus @default(DRAFT)
+  downloads   Int        @default(0)
+  
+  bookmarks   Bookmark[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  publishedAt DateTime?
+
+  @@index([slug])
+  @@index([status])
+  @@map("books")
+}
+
+// ==================== Q&A ====================
+
+enum QuestionStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model Question {
+  id          String         @id @default(cuid())
+  userId      String
+  title       String
+  content     String
+  status      QuestionStatus @default(OPEN)
+  views       Int            @default(0)
+  
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("questions")
+}
+
+model Answer {
+  id          String   @id @default(cuid())
+  questionId  String
+  userId      String
+  content     String
+  isAccepted  Boolean  @default(false)
+  
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([questionId])
+  @@index([userId])
+  @@map("answers")
+}
+
+// ==================== BOOKMARKS ====================
+
+enum BookmarkType {
+  ARTICLE
+  BOOK
+  COURSE
+}
+
+model Bookmark {
+  id        String       @id @default(cuid())
+  userId    String
+  type      BookmarkType
+  articleId String?
+  bookId    String?
+  courseId  String?
+  
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article?     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  book      Book?        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, type, articleId, bookId, courseId])
+  @@index([userId])
+  @@map("bookmarks")
+}
