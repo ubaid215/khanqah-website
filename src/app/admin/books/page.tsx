@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +22,7 @@ import {
 import { BookWithRelations, BookStatus } from '@/types'
 
 export default function BooksPage() {
+  const router = useRouter()
   const [books, setBooks] = useState<BookWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -43,6 +45,10 @@ export default function BooksPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleUploadBook = () => {
+    router.push('/admin/books/create')
   }
 
   const handleDeleteBook = async (bookId: string) => {
@@ -100,7 +106,10 @@ export default function BooksPage() {
             Upload, edit, and manage your books
           </p>
         </div>
-        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+        <Button 
+          className="bg-purple-600 hover:bg-purple-700 text-white"
+          onClick={handleUploadBook}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Upload Book
         </Button>

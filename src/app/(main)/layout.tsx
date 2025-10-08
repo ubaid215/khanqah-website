@@ -1,41 +1,50 @@
 // src/app/(main)/layout.tsx
-'use client'
+"use client";
 
-import { useAuth } from '@/hooks/useAuth'
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
+import { useAuth } from "@/hooks/useAuth";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
 
 interface MainLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
-  const { isLoading } = useAuth()
+  const { isLoading } = useAuth();
 
-  // Show loading state while checking authentication
-  // This ensures any auth-dependent content in main pages loads properly
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
-    )
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Main website layout - add headers, footers, navigation here later */}
+    <div className="min-h-screen">
       <div className="flex flex-col min-h-screen">
-        {/* Header can be added here */}
-        {/* <Header /> */}
-        
-        {/* Main content */}
-        <main className="flex-1">
+        <Navbar />
+
+        {/* Main content - Fully responsive padding for navbar */}
+        <main className="flex-1 pt-[56px] sm:pt-[64px] lg:pt-[112px]">
           {children}
         </main>
-        
-        {/* Footer can be added here */}
-        {/* <Footer /> */}
+
+        <style jsx>{`
+          @media (min-width: 640px) {
+            main {
+              padding-top: var(--navbar-height-tablet);
+            }
+          }
+          @media (min-width: 1024px) {
+            main {
+              padding-top: var(--navbar-height-desktop);
+            }
+          }
+        `}</style>
+        <Footer />
       </div>
     </div>
-  )
+  );
 }

@@ -1,7 +1,7 @@
-// src/providers/AuthProvider.tsx - Update the useEffect
+// src/providers/AuthProvider.tsx
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { AuthUser } from '@/types'
 import { apiClient } from '@/lib/api'
 
@@ -26,18 +26,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isAuthenticated = !!user
 
-  const refreshUser = async () => {
+  // Use useCallback to memoize the function and prevent unnecessary re-renders
+  const refreshUser = useCallback(async () => {
     try {
       const response = await apiClient.getProfile()
       if (response.success) {
         setUser(response.data)
+        return true
       }
-    } catch (error) {
+      return false
+    } catch (error: any) {
       console.error('Failed to refresh user:', error)
-      setUser(null)
-      // Don't remove token here, let the interceptor handle it
+      // Only clear user state if it's an auth error (401/403)
+      if (error.status === 401 || error.status === 403) {
+        setUser(null)
+        localStorage.removeItem('token')
+      }
+      return false
     }
-  }
+  }, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
@@ -64,22 +71,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Check authentication status on mount
   useEffect(() => {
+    let mounted = true
+
     const checkAuth = async () => {
       const token = localStorage.getItem('token')
-      if (token) {
-        try {
-          await refreshUser()
-        } catch (error) {
-          console.error('Auth check failed:', error)
-          // Only remove token if it's definitely invalid
-          localStorage.removeItem('token')
+      
+      if (!token) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const success = await refreshUser()
+        // Only update state if component is still mounted
+        if (mounted && !success) {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        // Don't remove token on network errors or other non-auth issues
+        if (mounted) {
+          setUser(null)
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false)
         }
       }
-      setIsLoading(false)
     }
 
     checkAuth()
-  }, [])
+
+    // Cleanup function
+    return () => {
+      mounted = false
+    }
+  }, [refreshUser]) // Now refreshUser is properly memoized with useCallback
 
   const value: AuthContextType = {
     user,

@@ -32,6 +32,9 @@ export interface RegisterData {
 }
 
 export interface AuthUser {
+  success: any
+  data(data: any): unknown
+  error: string
   id: string
   email: string
   username?: string | null
@@ -351,6 +354,8 @@ export interface QuestionFilters {
 }
 
 export interface QuestionWithRelations {
+  success: any
+  data: any
   id: string
   userId: string
   title: string

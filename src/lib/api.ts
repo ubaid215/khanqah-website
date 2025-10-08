@@ -68,15 +68,34 @@ export class ApiClient {
 
     try {
       const response = await fetch(url, config)
+      
+      // Handle empty responses (like 204 No Content)
+      if (response.status === 204) {
+        return { success: true, data: null as any }
+      }
+
       const data = await response.json()
 
       if (!response.ok) {
-        throw new ApiError(
+        // Create error with proper status code
+        const error = new ApiError(
           data.error || 'API request failed',
           response.status,
           data.code,
           data.details
         )
+
+        // If it's an auth error and we're not on the login/register endpoint
+        if ((response.status === 401 || response.status === 403) && 
+            !endpoint.includes('/auth/login') && 
+            !endpoint.includes('/auth/register')) {
+          // Only remove token if it's definitely an auth failure
+          if (typeof window !== 'undefined' && data.error?.toLowerCase().includes('token')) {
+            localStorage.removeItem('token')
+          }
+        }
+
+        throw error
       }
 
       return data
@@ -84,7 +103,8 @@ export class ApiClient {
       if (error instanceof ApiError) {
         throw error
       }
-      throw new ApiError('Network error', 0, 'NETWORK_ERROR')
+      // Don't remove token on network errors
+      throw new ApiError('Network error or server unavailable', 0, 'NETWORK_ERROR')
     }
   }
 
@@ -125,7 +145,10 @@ export class ApiClient {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await this.post<AuthResponse>('/auth/login', credentials)
     if (response.success && response.data?.token) {
-      localStorage.setItem('token', response.data.token)
+      // Store token in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', response.data.token)
+      }
     }
     return response.data!
   }
@@ -133,7 +156,10 @@ export class ApiClient {
   async register(userData: RegisterData): Promise<AuthResponse> {
     const response = await this.post<AuthResponse>('/auth/register', userData)
     if (response.success && response.data?.token) {
-      localStorage.setItem('token', response.data.token)
+      // Store token in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('token', response.data.token)
+      }
     }
     return response.data!
   }
@@ -142,14 +168,39 @@ export class ApiClient {
     try {
       await this.post('/auth/logout')
     } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+      }
+    }
+  }
+
+   async getProfile(): Promise<ApiResponse<AuthUser>> {
+    // Return the full response to check success status
+    return this.get<AuthUser>('/auth/profile')
+  }
+
+  // Token management with additional checks
+  getToken(): string | null {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('token')
+  }
+
+  setToken(token: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', token)
+    }
+  }
+
+  removeToken(): void {
+    if (typeof window !== 'undefined') {
       localStorage.removeItem('token')
     }
   }
 
-  async getProfile(): Promise<AuthUser> {
-    const response = await this.get<AuthUser>('/auth/profile')
-    return response.data!
+  isAuthenticated(): boolean {
+    return this.getToken() !== null
   }
+
 
   async updateProfile(profileData: UpdateProfileData): Promise<AuthUser> {
     const response = await this.put<AuthUser>('/auth/profile', profileData)
@@ -457,28 +508,7 @@ export class ApiClient {
     return response.data!
   }
 
-  // Token management
-  getToken(): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem('token')
-  }
-
-  setToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token)
-    }
-  }
-
-  removeToken(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token')
-    }
-  }
-
-  // Check if user is authenticated
-  isAuthenticated(): boolean {
-    return this.getToken() !== null
-  }
+  
 }
 
 // Create singleton instance

@@ -99,7 +99,8 @@ declare module '@prisma/client' {
   export enum UserRole {
     USER = 'USER',
     ADMIN = 'ADMIN',
-    INSTRUCTOR = 'INSTRUCTOR'
+    INSTRUCTOR = 'INSTRUCTOR',
+    SUPER_ADMIN = "SUPER_ADMIN"
   }
 
   // Course Level Enum

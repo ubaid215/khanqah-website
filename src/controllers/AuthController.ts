@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
 
 // Response helper
-class ApiResponse {
+export class ApiResponse {
   static success(data: any, message?: string, status: number = 200) {
     return NextResponse.json({
       success: true,
