@@ -1,32 +1,48 @@
 // src/app/dashboard/layout.tsx
+'use client'
+
+import { useAuth } from '@/hooks/useAuth'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { DashboardSidebar } from '@/components/layout/dashboard-sidebar'
-import { DashboardHeader } from '@/components/layout/dashboard-header'
+import { UserRole } from '@prisma/client'
 
-export default async function DashboardLayout({
-  children,
-}: {
+interface DashboardLayoutProps {
   children: React.ReactNode
-}) {
-  const session = await getServerSession(authOptions)
+}
 
-  if (!session) {
-    redirect('/auth/signin')
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { user, isLoading, isAuthenticated } = useAuth()
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    redirect('/auth/login?redirect=/dashboard')
+  }
+
+  // Redirect to appropriate dashboard based on role
+  if (user) {
+    if (user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN) {
+      redirect('/admin')
+    }
+    
+    // For regular users, ensure they can access the dashboard
+    if (user.role === UserRole.USER) {
+      // Continue to render the dashboard
+    }
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <DashboardSidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <DashboardHeader user={session.user} />
-        <main className="flex-1 p-6 bg-gray-50">
-          {children}
-        </main>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8">
+        {children}
       </div>
     </div>
   )

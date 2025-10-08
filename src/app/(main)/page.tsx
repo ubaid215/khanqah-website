@@ -1,7 +1,7 @@
 // src/app/(main)/page.tsx
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { GraduationCap, BookOpen, Library, MessageCircle, ArrowRight, CheckCircle } from 'lucide-react'
 
 export default function HomePage() {

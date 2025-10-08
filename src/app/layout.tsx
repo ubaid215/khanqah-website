@@ -1,42 +1,31 @@
 // src/app/layout.tsx
-import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Providers } from '@/components/providers'
+import { AuthProvider } from '@/providers/AuthProvider'
+import { ThemeProvider } from '@/providers/ThemeProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: 'LMS Platform - Learn, Grow, Succeed',
-  description: 'Comprehensive learning management system with courses, articles, and interactive learning',
-  keywords: 'LMS, learning, courses, education, online learning, tutorials',
-  authors: [{ name: 'Your Institute Name' }],
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://yourdomain.com',
-    title: 'LMS Platform - Learn, Grow, Succeed',
-    description: 'Comprehensive learning management system',
-    siteName: 'LMS Platform',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'LMS Platform',
-    description: 'Comprehensive learning management system',
-  },
+export const metadata = {
+  title: 'LMS Platform',
+  description: 'Learn, Grow, Succeed - Your journey starts here',
 }
 
-export default function RootLayout({
-  children,
-}: {
+interface RootLayoutProps {
   children: React.ReactNode
-}) {
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
-          {children}
-        </Providers>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <AuthProvider>
+            <main className="min-h-screen bg-background">
+              {children}
+            </main>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
