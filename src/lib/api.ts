@@ -48,14 +48,32 @@ class ApiError extends Error {
 }
 
 export class ApiClient {
+  // Enhanced token management
+  private getStoredToken(): string | null {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('token')
+  }
+
+  private setStoredToken(token: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', token)
+    }
+  }
+
+  private removeStoredToken(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token')
+    }
+  }
+
   private async request<T = any>(
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${API_BASE_URL}${endpoint}`
     
-    // Get token from localStorage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    // Use the enhanced token getter
+    const token = this.getStoredToken()
     
     const config: RequestInit = {
       headers: {
@@ -85,13 +103,14 @@ export class ApiClient {
           data.details
         )
 
-        // If it's an auth error and we're not on the login/register endpoint
+        // Enhanced auth error handling
         if ((response.status === 401 || response.status === 403) && 
             !endpoint.includes('/auth/login') && 
             !endpoint.includes('/auth/register')) {
-          // Only remove token if it's definitely an auth failure
-          if (typeof window !== 'undefined' && data.error?.toLowerCase().includes('token')) {
-            localStorage.removeItem('token')
+          this.removeStoredToken()
+          // Also clear user data from localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('user')
           }
         }
 
@@ -145,10 +164,7 @@ export class ApiClient {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await this.post<AuthResponse>('/auth/login', credentials)
     if (response.success && response.data?.token) {
-      // Store token in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('token', response.data.token)
-      }
+      this.setStoredToken(response.data.token)
     }
     return response.data!
   }
@@ -156,10 +172,7 @@ export class ApiClient {
   async register(userData: RegisterData): Promise<AuthResponse> {
     const response = await this.post<AuthResponse>('/auth/register', userData)
     if (response.success && response.data?.token) {
-      // Store token in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('token', response.data.token)
-      }
+      this.setStoredToken(response.data.token)
     }
     return response.data!
   }
@@ -168,13 +181,15 @@ export class ApiClient {
     try {
       await this.post('/auth/logout')
     } finally {
+      this.removeStoredToken()
+      // Also clear user data
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('token')
+        localStorage.removeItem('user')
       }
     }
   }
 
-   async getProfile(): Promise<ApiResponse<AuthUser>> {
+  async getProfile(): Promise<ApiResponse<AuthUser>> {
     // Return the full response to check success status
     return this.get<AuthUser>('/auth/profile')
   }
@@ -200,7 +215,6 @@ export class ApiClient {
   isAuthenticated(): boolean {
     return this.getToken() !== null
   }
-
 
   async updateProfile(profileData: UpdateProfileData): Promise<AuthUser> {
     const response = await this.put<AuthUser>('/auth/profile', profileData)
@@ -228,7 +242,7 @@ export class ApiClient {
   }
 
   async updateUserRole(id: string, role: UserRole): Promise<AuthUser> {
-    const response = await this.put<AuthUser>(`/users/${id}`, { role })
+    const response = await this.put<AuthUser>(`/users/${id}/role`, { role })
     return response.data!
   }
 
@@ -242,15 +256,37 @@ export class ApiClient {
   }
 
   // Course methods
-  async getCourses(filters?: CourseFilters): Promise<PaginatedResponse<CourseWithRelations[]>> {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses${queryString}`)
+  async getCourses(filters?: CourseFilters): Promise<ApiResponse<PaginatedResponse<CourseWithRelations[]>>> {
+  // Build query string properly, excluding undefined values
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses${queryString}`)
+}
 
-  async getPublicCourses(filters?: Omit<CourseFilters, 'status' | 'isPublished'>) {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses/public${queryString}`)
+
+  async getPublicCourses(filters?: Omit<CourseFilters, 'status' | 'isPublished'>): Promise<ApiResponse<PaginatedResponse<CourseWithRelations[]>>> {
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses/public${queryString}`)
+}
 
   async getCourseById(id: string): Promise<CourseWithRelations> {
     const response = await this.get<CourseWithRelations>(`/courses/${id}`)
@@ -297,15 +333,35 @@ export class ApiClient {
   }
 
   // Article methods
-  async getArticles(filters?: ArticleFilters): Promise<PaginatedResponse<ArticleWithRelations[]>> {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles${queryString}`)
+  async getArticles(filters?: ArticleFilters): Promise<ApiResponse<PaginatedResponse<ArticleWithRelations[]>>> {
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles${queryString}`)
+}
 
-  async getPublicArticles(filters?: Omit<ArticleFilters, 'status'>) {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles/public${queryString}`)
+  async getPublicArticles(filters?: Omit<ArticleFilters, 'status'>): Promise<ApiResponse<PaginatedResponse<ArticleWithRelations[]>>> {
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles/public${queryString}`)
+}
 
   async getArticleById(id: string): Promise<ArticleWithRelations> {
     const response = await this.get<ArticleWithRelations>(`/articles/${id}`)
@@ -348,15 +404,35 @@ export class ApiClient {
   }
 
   // Book methods
-  async getBooks(filters?: BookFilters): Promise<PaginatedResponse<BookWithRelations[]>> {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<BookWithRelations[]>>(`/books${queryString}`)
+  async getBooks(filters?: BookFilters): Promise<ApiResponse<PaginatedResponse<BookWithRelations[]>>> {
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<BookWithRelations[]>>(`/books${queryString}`)
+}
 
-  async getPublicBooks(filters?: Omit<BookFilters, 'status'>) {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
-    return this.get<PaginatedResponse<BookWithRelations[]>>(`/books/public${queryString}`)
+async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse<PaginatedResponse<BookWithRelations[]>>> {
+  const params = new URLSearchParams()
+  
+  if (filters) {
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
   }
+  
+  const queryString = params.toString() ? `?${params.toString()}` : ''
+  return this.get<PaginatedResponse<BookWithRelations[]>>(`/books/public${queryString}`)
+}
 
   async getBookById(id: string): Promise<BookWithRelations> {
     const response = await this.get<BookWithRelations>(`/books/${id}`)
@@ -399,7 +475,7 @@ export class ApiClient {
   }
 
   // Question & Answer methods
-  async getQuestions(filters?: QuestionFilters): Promise<PaginatedResponse<QuestionWithRelations[]>> {
+  async getQuestions(filters?: QuestionFilters): Promise<ApiResponse<PaginatedResponse<QuestionWithRelations[]>>> {
     const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
     return this.get<PaginatedResponse<QuestionWithRelations[]>>(`/questions${queryString}`)
   }
@@ -460,7 +536,10 @@ export class ApiClient {
   }
 
   async deleteBookmarkByResource(data: Omit<CreateBookmarkData, 'userId'>): Promise<void> {
-    await this.delete('/bookmarks/resource', data)
+    const response = await this.delete('/bookmarks/resource', {
+      body: JSON.stringify(data)
+    })
+    return response.data!
   }
 
   async getBookmarkCount(data: Omit<CreateBookmarkData, 'userId' | 'type'>): Promise<{ count: number }> {
@@ -474,7 +553,7 @@ export class ApiClient {
     const formData = new FormData()
     formData.append('file', file)
 
-    const token = localStorage.getItem('token')
+    const token = this.getStoredToken()
     const response = await fetch(`${API_BASE_URL}/upload`, {
       method: 'POST',
       headers: {
@@ -507,8 +586,6 @@ export class ApiClient {
     const response = await this.get('/health')
     return response.data!
   }
-
-  
 }
 
 // Create singleton instance

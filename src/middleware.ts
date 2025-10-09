@@ -1,26 +1,26 @@
 // src/middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { authMiddleware } from '@/middleware/auth'
-
-export async function middleware(request: NextRequest) {
-  // Apply auth middleware to all API routes
-  if (request.nextUrl.pathname.startsWith('/api/')) {
-    return authMiddleware(request)
-  }
-
-  return NextResponse.next()
-}
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
+    // Match all request paths except for the ones starting with:
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
+}
+
+export async function middleware(request: NextRequest) {
+  // Skip auth for public routes
+  if (request.nextUrl.pathname.startsWith('/api/auth/login') ||
+      request.nextUrl.pathname.startsWith('/api/auth/register') ||
+      request.nextUrl.pathname.startsWith('/api/courses/public') ||
+      request.nextUrl.pathname.startsWith('/api/articles/public') ||
+      request.nextUrl.pathname.startsWith('/api/books/public') ||
+      request.nextUrl.pathname.startsWith('/api/questions/public')) {
+    return NextResponse.next()
+  }
+
+  // For protected routes, let the API routes handle authentication
+  // We'll just pass through and the API routes will validate the token
+  return NextResponse.next()
 }

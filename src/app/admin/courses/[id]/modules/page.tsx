@@ -1,11 +1,10 @@
-// src/app/admin/courses/[id]/modules/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { 
@@ -15,9 +14,31 @@ import {
   Trash2,
   GripVertical,
   BookOpen,
-  Loader2
+  Loader2,
+  FileText,
+  PlayCircle,
+  CheckCircle,
+  Upload,
+  X
 } from 'lucide-react'
-import { CourseWithRelations, ModuleWithLessons } from '@/types'
+import { CourseWithRelations, LessonType } from '@/types'
+
+interface ModuleFormData {
+  title: string
+  description: string
+  order: number
+}
+
+interface LessonFormData {
+  title: string
+  description: string
+  type: LessonType
+  content: string
+  videoUrl: string
+  duration: number
+  order: number
+  isFree: boolean
+}
 
 export default function CourseModulesPage() {
   const router = useRouter()
@@ -27,11 +48,28 @@ export default function CourseModulesPage() {
   const [course, setCourse] = useState<CourseWithRelations | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showModuleForm, setShowModuleForm] = useState(false)
+  const [showLessonForm, setShowLessonForm] = useState(false)
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null)
   const [editingModule, setEditingModule] = useState<string | null>(null)
-  const [moduleForm, setModuleForm] = useState({
+  const [editingLesson, setEditingLesson] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  
+  const [moduleForm, setModuleForm] = useState<ModuleFormData>({
     title: '',
     description: '',
     order: 0
+  })
+
+  const [lessonForm, setLessonForm] = useState<LessonFormData>({
+    title: '',
+    description: '',
+    type: LessonType.VIDEO,
+    content: '',
+    videoUrl: '',
+    duration: 0,
+    order: 0,
+    isFree: false
   })
 
   useEffect(() => {
@@ -40,12 +78,18 @@ export default function CourseModulesPage() {
 
   const fetchCourse = async () => {
     try {
+      setIsLoading(true)
       const response = await apiClient.getCourseById(courseId)
-      if (response.success) {
-        setCourse(response)
+      
+      if (response && (response.data || response)) {
+        const courseData = response.data || response
+        setCourse(courseData)
+      } else {
+        throw new Error('Course not found')
       }
     } catch (error) {
       console.error('Failed to fetch course:', error)
+      alert('Failed to load course data')
     } finally {
       setIsLoading(false)
     }
@@ -55,33 +99,238 @@ export default function CourseModulesPage() {
     e.preventDefault()
     
     try {
-      await apiClient.createModule({
+      const response = await apiClient.createModule({
         courseId,
         title: moduleForm.title,
         description: moduleForm.description,
         order: moduleForm.order
       })
       
-      setShowModuleForm(false)
-      setModuleForm({ title: '', description: '', order: 0 })
-      fetchCourse() // Refresh course data
+      if (response && !response.error) {
+        setShowModuleForm(false)
+        setModuleForm({ title: '', description: '', order: 0 })
+        setEditingModule(null)
+        await fetchCourse()
+      } else {
+        throw new Error(response?.error || 'Failed to create module')
+      }
     } catch (error: any) {
       console.error('Failed to create module:', error)
       alert(error.message || 'Failed to create module')
     }
   }
 
-  const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Are you sure you want to delete this module?')) return
+  const handleUpdateModule = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editingModule) return
     
     try {
-      // You'll need to add deleteModule method to apiClient
-      // await apiClient.deleteModule(moduleId)
-      fetchCourse() // Refresh course data
+      const response = await apiClient.updateModule(editingModule, {
+        title: moduleForm.title,
+        description: moduleForm.description,
+        order: moduleForm.order
+      })
+      
+      if (response && !response.error) {
+        setShowModuleForm(false)
+        setModuleForm({ title: '', description: '', order: 0 })
+        setEditingModule(null)
+        await fetchCourse()
+      } else {
+        throw new Error(response?.error || 'Failed to update module')
+      }
+    } catch (error: any) {
+      console.error('Failed to update module:', error)
+      alert(error.message || 'Failed to update module')
+    }
+  }
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedModuleId) return
+    
+    try {
+      const response = await apiClient.createLesson({
+        moduleId: selectedModuleId,
+        title: lessonForm.title,
+        description: lessonForm.description,
+        type: lessonForm.type,
+        content: lessonForm.content,
+        videoUrl: lessonForm.videoUrl,
+        duration: lessonForm.duration,
+        order: lessonForm.order,
+        isFree: lessonForm.isFree
+      })
+      
+      if (response && !response.error) {
+        setShowLessonForm(false)
+        resetLessonForm()
+        await fetchCourse()
+      } else {
+        throw new Error(response?.error || 'Failed to create lesson')
+      }
+    } catch (error: any) {
+      console.error('Failed to create lesson:', error)
+      alert(error.message || 'Failed to create lesson')
+    }
+  }
+
+  const handleUpdateLesson = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editingLesson) return
+    
+    try {
+      const response = await apiClient.updateLesson(editingLesson, {
+        title: lessonForm.title,
+        description: lessonForm.description,
+        type: lessonForm.type,
+        content: lessonForm.content,
+        videoUrl: lessonForm.videoUrl,
+        duration: lessonForm.duration,
+        order: lessonForm.order,
+        isFree: lessonForm.isFree
+      })
+      
+      if (response && !response.error) {
+        setShowLessonForm(false)
+        resetLessonForm()
+        await fetchCourse()
+      } else {
+        throw new Error(response?.error || 'Failed to update lesson')
+      }
+    } catch (error: any) {
+      console.error('Failed to update lesson:', error)
+      alert(error.message || 'Failed to update lesson')
+    }
+  }
+
+  const handleDeleteModule = async (moduleId: string) => {
+    if (!confirm('Are you sure you want to delete this module? This will also delete all lessons in this module.')) return
+    
+    try {
+      await apiClient.deleteModule(moduleId)
+      await fetchCourse()
     } catch (error: any) {
       console.error('Failed to delete module:', error)
       alert(error.message || 'Failed to delete module')
     }
+  }
+
+  const handleDeleteLesson = async (lessonId: string) => {
+    if (!confirm('Are you sure you want to delete this lesson?')) return
+    
+    try {
+      await apiClient.deleteLesson(lessonId)
+      await fetchCourse()
+    } catch (error: any) {
+      console.error('Failed to delete lesson:', error)
+      alert(error.message || 'Failed to delete lesson')
+    }
+  }
+
+  const handleEditModule = (module: any) => {
+    setEditingModule(module.id)
+    setModuleForm({
+      title: module.title,
+      description: module.description || '',
+      order: module.order
+    })
+    setShowModuleForm(true)
+  }
+
+  const handleEditLesson = (lesson: any) => {
+    setEditingLesson(lesson.id)
+    setSelectedModuleId(lesson.moduleId)
+    setLessonForm({
+      title: lesson.title,
+      description: lesson.description || '',
+      type: lesson.type,
+      content: lesson.content || '',
+      videoUrl: lesson.videoUrl || '',
+      duration: lesson.duration || 0,
+      order: lesson.order,
+      isFree: lesson.isFree || false
+    })
+    setShowLessonForm(true)
+  }
+
+  const handleAddLesson = (moduleId: string) => {
+    setSelectedModuleId(moduleId)
+    setEditingLesson(null)
+    resetLessonForm()
+    setShowLessonForm(true)
+  }
+
+  const resetLessonForm = () => {
+    setLessonForm({
+      title: '',
+      description: '',
+      type: LessonType.VIDEO,
+      content: '',
+      videoUrl: '',
+      duration: 0,
+      order: 0,
+      isFree: false
+    })
+    setSelectedModuleId(null)
+    setEditingLesson(null)
+  }
+
+  const handleVideoUpload = async (file: File) => {
+    setUploading(true)
+    setUploadProgress(0)
+    
+    try {
+      const uploadResult = await apiClient.uploadFile(file, (progress) => {
+        setUploadProgress(progress)
+      })
+      
+      setLessonForm(prev => ({ ...prev, videoUrl: uploadResult.url }))
+    } catch (error: any) {
+      console.error('Upload failed:', error)
+      alert(error.message || 'Video upload failed')
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  const getLessonIcon = (type: LessonType) => {
+    switch (type) {
+      case LessonType.VIDEO:
+        return <PlayCircle className="h-4 w-4 text-blue-500" />
+      case LessonType.ARTICLE:
+        return <FileText className="h-4 w-4 text-green-500" />
+      case LessonType.QUIZ:
+        return <CheckCircle className="h-4 w-4 text-purple-500" />
+      default:
+        return <FileText className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  const getLessonTypeLabel = (type: LessonType) => {
+    switch (type) {
+      case LessonType.VIDEO:
+        return 'Video'
+      case LessonType.ARTICLE:
+        return 'Article'
+      case LessonType.QUIZ:
+        return 'Quiz'
+      default:
+        return 'Lesson'
+    }
+  }
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} min`
+    }
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
   }
 
   if (isLoading) {
@@ -122,13 +371,17 @@ export default function CourseModulesPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
             <p className="text-gray-600 mt-1">
-              Manage course modules and lessons
+              Manage course modules and lessons • {course.modules?.length || 0} modules • {course._count?.lessons || 0} lessons
             </p>
           </div>
         </div>
         
         <Button
-          onClick={() => setShowModuleForm(true)}
+          onClick={() => {
+            setEditingModule(null)
+            setModuleForm({ title: '', description: '', order: course.modules?.length || 0 })
+            setShowModuleForm(true)
+          }}
           className="bg-blue-600 hover:bg-blue-700 text-white"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -136,7 +389,7 @@ export default function CourseModulesPage() {
         </Button>
       </div>
 
-      {/* Module Creation Form */}
+      {/* Module Creation/Edit Form */}
       {showModuleForm && (
         <Card className="bg-white border border-gray-200 shadow-sm">
           <CardHeader>
@@ -145,14 +398,14 @@ export default function CourseModulesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleCreateModule} className="space-y-4">
+            <form onSubmit={editingModule ? handleUpdateModule : handleCreateModule} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Module Title *
                 </label>
                 <Input
                   value={moduleForm.title}
-                  onChange={(e: { target: { value: any } }) => setModuleForm(prev => ({ ...prev, title: e.target.value }))}
+                  onChange={(e) => setModuleForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter module title"
                   required
                 />
@@ -164,7 +417,7 @@ export default function CourseModulesPage() {
                 </label>
                 <Textarea
                   value={moduleForm.description}
-                  onChange={(e: { target: { value: any } }) => setModuleForm(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => setModuleForm(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Module description"
                   rows={3}
                 />
@@ -177,14 +430,18 @@ export default function CourseModulesPage() {
                 <Input
                   type="number"
                   value={moduleForm.order}
-                  onChange={(e: { target: { value: string } }) => setModuleForm(prev => ({ ...prev, order: parseInt(e.target.value) }))}
+                  onChange={(e) => setModuleForm(prev => ({ ...prev, order: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
                   min="0"
                 />
               </div>
 
               <div className="flex space-x-2">
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={!moduleForm.title.trim()}
+                >
                   {editingModule ? 'Update Module' : 'Create Module'}
                 </Button>
                 <Button
@@ -204,79 +461,360 @@ export default function CourseModulesPage() {
         </Card>
       )}
 
-      {/* Modules List */}
-      <div className="space-y-4">
-        {course.modules?.map((module) => (
-          <Card key={module.id} className="bg-white border border-gray-200 shadow-sm">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <GripVertical className="h-5 w-5 text-gray-400 cursor-move" />
-                  <CardTitle className="text-lg font-semibold">
-                    {module.title}
-                  </CardTitle>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-300"
-                    onClick={() => {
-                      setEditingModule(module.id)
-                      setModuleForm({
-                        title: module.title,
-                        description: module.description || '',
-                        order: module.order
-                      })
-                      setShowModuleForm(true)
-                    }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-300 text-red-600 hover:text-red-700"
-                    onClick={() => handleDeleteModule(module.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+      {/* Lesson Creation/Edit Form */}
+      {showLessonForm && (
+        <Card className="bg-white border border-gray-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">
+              {editingLesson ? 'Edit Lesson' : 'Create New Lesson'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={editingLesson ? handleUpdateLesson : handleCreateLesson} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Title *
+                </label>
+                <Input
+                  value={lessonForm.title}
+                  onChange={(e) => setLessonForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter lesson title"
+                  required
+                />
               </div>
-              {module.description && (
-                <p className="text-gray-600 mt-2">{module.description}</p>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {module.lessons.map((lesson) => (
-                  <div
-                    key={lesson.id}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
-                      <span className="font-medium text-gray-900">{lesson.title}</span>
-                      <span className="text-sm text-gray-500 capitalize">{lesson.type}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" className="border-gray-300">
-                        <Edit className="h-3 w-3" />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <Textarea
+                  value={lessonForm.description}
+                  onChange={(e) => setLessonForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Lesson description"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Type
+                </label>
+                <select
+                  value={lessonForm.type}
+                  onChange={(e) => setLessonForm(prev => ({ ...prev, type: e.target.value as LessonType }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value={LessonType.VIDEO}>Video</option>
+                  <option value={LessonType.ARTICLE}>Article</option>
+                  <option value={LessonType.QUIZ}>Quiz</option>
+                </select>
+              </div>
+
+              {lessonForm.type === LessonType.VIDEO && (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Video Upload
+                  </label>
+                  
+                  {lessonForm.videoUrl ? (
+                    <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <PlayCircle className="h-5 w-5 text-green-600" />
+                        <span className="text-sm text-green-800">Video uploaded successfully</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLessonForm(prev => ({ ...prev, videoUrl: '' }))}
+                        className="text-red-600 hover:text-red-700 border-red-300"
+                      >
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            // Validate file size (50MB max)
+                            if (file.size > 50 * 1024 * 1024) {
+                              alert('Video file must be less than 50MB')
+                              return
+                            }
+                            handleVideoUpload(file)
+                          }
+                        }}
+                        className="hidden"
+                        id="video-upload"
+                        disabled={uploading}
+                      />
+                      <label
+                        htmlFor="video-upload"
+                        className={`cursor-pointer flex flex-col items-center justify-center space-y-2 ${
+                          uploading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <Upload className="h-8 w-8 text-gray-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">
+                            {uploading ? `Uploading... ${uploadProgress}%` : 'Click to upload video'}
+                          </p>
+                          <p className="text-xs text-gray-500">MP4, MOV, AVI up to 50MB</p>
+                        </div>
+                      </label>
+                      {uploading && (
+                        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Or enter video URL
+                    </label>
+                    <Input
+                      value={lessonForm.videoUrl}
+                      onChange={(e) => setLessonForm(prev => ({ ...prev, videoUrl: e.target.value }))}
+                      placeholder="https://example.com/video.mp4"
+                    />
                   </div>
-                ))}
-                <Button
-                  variant="outline"
-                  className="w-full border-dashed border-gray-300 text-gray-600"
+                </div>
+              )}
+
+              {lessonForm.type === LessonType.ARTICLE && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Content
+                  </label>
+                  <Textarea
+                    value={lessonForm.content}
+                    onChange={(e) => setLessonForm(prev => ({ ...prev, content: e.target.value }))}
+                    placeholder="Lesson content in markdown format"
+                    rows={6}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Duration (minutes)
+                  </label>
+                  <Input
+                    type="number"
+                    value={lessonForm.duration}
+                    onChange={(e) => setLessonForm(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Order
+                  </label>
+                  <Input
+                    type="number"
+                    value={lessonForm.order}
+                    onChange={(e) => setLessonForm(prev => ({ ...prev, order: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isFree"
+                  checked={lessonForm.isFree}
+                  onChange={(e) => setLessonForm(prev => ({ ...prev, isFree: e.target.checked }))}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="isFree" className="text-sm font-medium text-gray-700">
+                  Free lesson (available without enrollment)
+                </label>
+              </div>
+
+              <div className="flex space-x-2">
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={!lessonForm.title.trim() || uploading}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Lesson
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : editingLesson ? (
+                    'Update Lesson'
+                  ) : (
+                    'Create Lesson'
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowLessonForm(false)
+                    resetLessonForm()
+                  }}
+                  disabled={uploading}
+                >
+                  Cancel
                 </Button>
               </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modules List */}
+      <div className="space-y-4">
+        {course.modules && course.modules.length > 0 ? (
+          course.modules
+            .sort((a, b) => a.order - b.order)
+            .map((module) => (
+            <Card key={module.id} className="bg-white border border-gray-200 shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <GripVertical className="h-5 w-5 text-gray-400 cursor-move" />
+                    <div>
+                      <CardTitle className="text-lg font-semibold">
+                        {module.title}
+                      </CardTitle>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Order: {module.order} • {module.lessons?.length || 0} lessons
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-300"
+                      onClick={() => handleEditModule(module)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-gray-300 text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteModule(module.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {module.description && (
+                  <p className="text-gray-600 mt-2">{module.description}</p>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {module.lessons && module.lessons.length > 0 ? (
+                    module.lessons
+                      .sort((a, b) => a.order - b.order)
+                      .map((lesson) => (
+                      <div
+                        key={lesson.id}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center space-x-3 flex-1">
+                          <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
+                          {getLessonIcon(lesson.type)}
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium text-gray-900">{lesson.title}</span>
+                              {lesson.isFree && (
+                                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                  Free
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
+                              <span className="capitalize">{getLessonTypeLabel(lesson.type)}</span>
+                              {lesson.duration > 0 && (
+                                <span>{formatDuration(lesson.duration)}</span>
+                              )}
+                              <span>Order: {lesson.order}</span>
+                              {lesson.videoUrl && (
+                                <span className="text-blue-600">Video Ready</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-gray-300"
+                            onClick={() => handleEditLesson(lesson)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="border-gray-300 text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteLesson(lesson.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      No lessons in this module yet
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed border-gray-300 text-gray-600 hover:text-gray-700"
+                    onClick={() => handleAddLesson(module.id)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Lesson
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card className="bg-white border border-gray-200 shadow-sm">
+            <CardContent className="p-12 text-center">
+              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No modules yet</h3>
+              <p className="text-gray-500 mb-4">
+                Start by creating your first module to organize your course content
+              </p>
+              <Button
+                onClick={() => {
+                  setEditingModule(null)
+                  setModuleForm({ title: '', description: '', order: 0 })
+                  setShowModuleForm(true)
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Module
+              </Button>
             </CardContent>
           </Card>
-        ))}
+        )}
       </div>
     </div>
   )

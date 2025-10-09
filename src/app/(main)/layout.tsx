@@ -23,11 +23,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <div className="min-h-screen">
-      <div className="flex flex-col min-h-screen">
+      <div>
         <Navbar />
 
         {/* Main content - Fully responsive padding for navbar */}
-        <main className="flex-1 pt-[56px] sm:pt-[64px] lg:pt-[112px]">
+        <main className=" pt-[56px] sm:pt-[64px] lg:pt-[112px]">
           {children}
         </main>
 

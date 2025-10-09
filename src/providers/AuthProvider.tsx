@@ -20,38 +20,83 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
+// Helper functions for localStorage
+const storage = {
+  getUser: (): AuthUser | null => {
+    if (typeof window === 'undefined') return null
+    const userStr = localStorage.getItem('user')
+    return userStr ? JSON.parse(userStr) : null
+  },
+  setUser: (user: AuthUser | null): void => {
+    if (typeof window === 'undefined') return
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user))
+    } else {
+      localStorage.removeItem('user')
+    }
+  },
+  clear: (): void => {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+  }
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Initialize from localStorage on mount
+  useEffect(() => {
+    const savedUser = storage.getUser()
+    if (savedUser) {
+      setUser(savedUser)
+    }
+    setIsLoading(false)
+  }, [])
+
   const isAuthenticated = !!user
 
-  // Use useCallback to memoize the function and prevent unnecessary re-renders
-  const refreshUser = useCallback(async () => {
-    try {
-      const response = await apiClient.getProfile()
-      if (response.success) {
-        setUser(response.data)
-        return true
+const refreshUser = useCallback(async () => {
+  try {
+    const response = await apiClient.getProfile()
+    if (response.success && response.data) {
+      setUser(response.data)
+      // Store user based on current storage type
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+      if (token === localStorage.getItem('token')) {
+        localStorage.setItem('user', JSON.stringify(response.data))
+      } else {
+        sessionStorage.setItem('user', JSON.stringify(response.data))
       }
-      return false
-    } catch (error: any) {
-      console.error('Failed to refresh user:', error)
-      // Only clear user state if it's an auth error (401/403)
-      if (error.status === 401 || error.status === 403) {
-        setUser(null)
-        localStorage.removeItem('token')
-      }
-      return false
+      return true
     }
-  }, [])
+    return false
+  } catch (error: any) {
+    console.error('Failed to refresh user:', error)
+    
+    // Clear all storage on auth errors
+    if (error.status === 401 || error.status === 403) {
+      setUser(null)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('user')
+        sessionStorage.removeItem('token')
+      }
+    }
+    return false
+  }
+}, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
       const response = await apiClient.login({ email, password })
       setUser(response.user)
+      storage.setUser(response.user)
     } catch (error) {
+      storage.clear()
       throw error
     } finally {
       setIsLoading(false)
@@ -65,7 +110,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Logout error:', error)
     } finally {
       setUser(null)
-      localStorage.removeItem('token')
+      storage.clear()
     }
   }
 
@@ -81,17 +126,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return
       }
 
+      // If we have a user in localStorage but no token was set, clear user
+      if (user && !token) {
+        setUser(null)
+        storage.clear()
+        setIsLoading(false)
+        return
+      }
+
       try {
         const success = await refreshUser()
-        // Only update state if component is still mounted
         if (mounted && !success) {
           setUser(null)
+          storage.clear()
         }
       } catch (error) {
         console.error('Auth check failed:', error)
-        // Don't remove token on network errors or other non-auth issues
         if (mounted) {
           setUser(null)
+          storage.clear()
         }
       } finally {
         if (mounted) {
@@ -102,11 +155,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     checkAuth()
 
-    // Cleanup function
     return () => {
       mounted = false
     }
-  }, [refreshUser]) // Now refreshUser is properly memoized with useCallback
+  }, [refreshUser])
 
   const value: AuthContextType = {
     user,

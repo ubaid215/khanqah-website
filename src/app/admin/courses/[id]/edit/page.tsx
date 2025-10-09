@@ -1,11 +1,10 @@
-// src/app/admin/courses/[id]/edit/page.tsx
 'use client'
 
-import { useState, useEffect, SetStateAction } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { 
@@ -49,22 +48,29 @@ export default function EditCoursePage() {
   const fetchCourse = async () => {
     try {
       const response = await apiClient.getCourseById(courseId)
-      if (response.success) {
-        setCourse(response)
+      
+      // Fixed: Handle different response structures
+      const courseData = response.data || response
+      
+      if (courseData) {
+        setCourse(courseData)
         setFormData({
-          title: response.title,
-          slug: response.slug,
-          description: response.description,
-          shortDesc: response.shortDesc || '',
-          thumbnail: response.thumbnail || '',
-          level: response.level,
-          price: parseFloat(response.price.toString()),
-          isFree: response.isFree,
-          status: response.status
+          title: courseData.title || '',
+          slug: courseData.slug || '',
+          description: courseData.description || '',
+          shortDesc: courseData.shortDesc || '',
+          thumbnail: courseData.thumbnail || '',
+          level: courseData.level || CourseLevel.BEGINNER,
+          price: courseData.price ? parseFloat(courseData.price.toString()) : 0,
+          isFree: courseData.isFree ?? true,
+          status: courseData.status || CourseStatus.DRAFT
         })
+        
         // Set categories from response
-        if (response.categories) {
-          setCategories(response.categories.map((cat: any) => cat.category.name))
+        if (courseData.categories) {
+          setCategories(courseData.categories.map((cat: any) => 
+            cat.category?.name || cat.name || ''
+          ).filter(Boolean))
         }
       }
     } catch (error) {
@@ -86,8 +92,12 @@ export default function EditCoursePage() {
       }
       
       const response = await apiClient.updateCourse(courseId, updateData)
-      if (response.success) {
+      
+      // Fixed: Check for success based on your API response
+      if (response) {
         router.push('/admin/courses')
+      } else {
+        throw new Error('Failed to update course')
       }
     } catch (error: any) {
       console.error('Failed to update course:', error)
@@ -120,6 +130,62 @@ export default function EditCoursePage() {
     } catch (error: any) {
       console.error('Failed to publish course:', error)
       alert(error.message || 'Failed to publish course')
+    }
+  }
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a valid image file (JPEG, PNG, WebP, or GIF)')
+      return
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      alert('File size must be less than 5MB')
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+      if (!token) {
+        alert('Please log in to upload files')
+        return
+      }
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData,
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setFormData(prev => ({
+          ...prev,
+          thumbnail: result.data.url
+        }))
+      } else {
+        alert(result.error || 'Failed to upload file')
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      alert('Upload failed. Please try again.')
+    } finally {
+      // Reset the file input
+      event.target.value = ''
     }
   }
 
@@ -194,7 +260,7 @@ export default function EditCoursePage() {
                   </label>
                   <Input
                     value={formData.title}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Enter course title"
                     required
                   />
@@ -206,7 +272,7 @@ export default function EditCoursePage() {
                   </label>
                   <Input
                     value={formData.slug}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
                     placeholder="course-slug"
                     required
                   />
@@ -218,7 +284,7 @@ export default function EditCoursePage() {
                   </label>
                   <Textarea
                     value={formData.shortDesc}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, shortDesc: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, shortDesc: e.target.value }))}
                     placeholder="Brief description of the course"
                     rows={3}
                   />
@@ -230,7 +296,7 @@ export default function EditCoursePage() {
                   </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Detailed description of the course content"
                     rows={6}
                     required
@@ -250,9 +316,9 @@ export default function EditCoursePage() {
                 <div className="flex space-x-2">
                   <Input
                     value={newCategory}
-                    onChange={(e: { target: { value: SetStateAction<string> } }) => setNewCategory(e.target.value)}
+                    onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="Add a category"
-                    onKeyPress={(e: { key: string; preventDefault: () => void }) => {
+                    onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
                         handleAddCategory()
@@ -359,7 +425,7 @@ export default function EditCoursePage() {
                         <Input
                           type="number"
                           value={formData.price}
-                          onChange={(e: { target: { value: string } }) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                          onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
                           placeholder="0.00"
                           step="0.01"
                           min="0"
@@ -384,13 +450,22 @@ export default function EditCoursePage() {
                   <p className="text-sm text-gray-600 mb-2">
                     Upload course thumbnail
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-gray-300"
-                  >
-                    Choose File
-                  </Button>
+                  <input
+                    type="file"
+                    id="thumbnail-upload"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <label htmlFor="thumbnail-upload" className="cursor-pointer">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-gray-300"
+                    >
+                      Choose File
+                    </Button>
+                  </label>
                 </div>
                 {formData.thumbnail && (
                   <div className="mt-4">
@@ -399,6 +474,16 @@ export default function EditCoursePage() {
                       alt="Course thumbnail"
                       className="w-full h-32 object-cover rounded-lg"
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => setFormData(prev => ({ ...prev, thumbnail: '' }))}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Remove
+                    </Button>
                   </div>
                 )}
               </CardContent>

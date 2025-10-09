@@ -21,7 +21,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <AuthProvider>
-            <main className="min-h-screen bg-background">
+            <main>
               {children}
             </main>
           </AuthProvider>

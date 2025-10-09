@@ -1,88 +1,165 @@
 // src/app/admin/courses/create/page.tsx
-'use client'
+"use client";
 
-import { SetStateAction, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { 
-  ArrowLeft,
-  Save,
-  Plus,
-  X,
-  Upload,
-  Loader2
-} from 'lucide-react'
-import { CourseLevel, CourseStatus } from '@/types'
+import { SetStateAction, useState } from "react";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { ArrowLeft, Save, Plus, X, Upload, Loader2 } from "lucide-react";
+import { CourseLevel, CourseStatus } from "@/types";
 
 export default function CreateCoursePage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [categories, setCategories] = useState<string[]>([])
-  const [newCategory, setNewCategory] = useState('')
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState("");
   const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    shortDesc: '',
-    thumbnail: '',
+    title: "",
+    slug: "",
+    description: "",
+    shortDesc: "",
+    thumbnail: "",
     level: CourseLevel.BEGINNER,
     price: 0,
-    isFree: true
-  })
+    isFree: true,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
       const courseData = {
         ...formData,
-        categoryIds: [] // You'll need to get category IDs from the category names
-      }
-      
-      const response = await apiClient.createCourse(courseData)
-      if (response.success) {
-        router.push('/admin/courses')
+        categoryIds: [], // You'll need to get category IDs from the category names
+      };
+
+      const response = await apiClient.createCourse(courseData);
+      // Fixed: Check for success based on your actual API response structure
+      if (response) { // Adjust this condition based on your actual API response
+        router.push("/admin/courses");
+      } else {
+        throw new Error("Failed to create course");
       }
     } catch (error: any) {
-      console.error('Failed to create course:', error)
-      alert(error.message || 'Failed to create course')
+      console.error("Failed to create course:", error);
+      alert(error.message || "Failed to create course");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+
+  // Helper function to get authentication token
+  const getAuthToken = (): string | null => {
+    // Try different methods to get the token
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('token') || 
+             sessionStorage.getItem('token') ||
+             null;
+    }
+    return null;
+  };
+
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert("File size must be less than 5MB");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // Get the authentication token using the helper function
+      const token = getAuthToken();
+
+      if (!token) {
+        alert("Please log in to upload files");
+        setIsUploading(false);
+        return;
+      }
+
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: uploadFormData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setFormData((prev) => ({
+          ...prev,
+          thumbnail: result.data.url,
+        }));
+      } else {
+        alert(result.error || "Failed to upload file");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+      // Reset the file input
+      event.target.value = "";
+    }
+  };
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()])
-      setNewCategory('')
+      setCategories([...categories, newCategory.trim()]);
+      setNewCategory("");
     }
-  }
+  };
 
   const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }
+    setCategories(categories.filter((cat) => cat !== categoryToRemove));
+  };
 
   const generateSlug = (title: string) => {
     return title
       .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim()
-  }
+      .replace(/[^a-z0-9 -]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim();
+  };
 
   const handleTitleChange = (title: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       title,
-      slug: generateSlug(title)
-    }))
-  }
+      slug: generateSlug(title),
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -96,7 +173,9 @@ export default function CreateCoursePage() {
           Back
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Course</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Create New Course
+          </h1>
           <p className="text-gray-600 mt-1">
             Add a new course to your learning platform
           </p>
@@ -121,7 +200,9 @@ export default function CreateCoursePage() {
                   </label>
                   <Input
                     value={formData.title}
-                    onChange={(e: { target: { value: string } }) => handleTitleChange(e.target.value)}
+                    onChange={(e: { target: { value: string } }) =>
+                      handleTitleChange(e.target.value)
+                    }
                     placeholder="Enter course title"
                     required
                   />
@@ -133,7 +214,9 @@ export default function CreateCoursePage() {
                   </label>
                   <Input
                     value={formData.slug}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e: { target: { value: any } }) =>
+                      setFormData((prev) => ({ ...prev, slug: e.target.value }))
+                    }
                     placeholder="course-slug"
                     required
                   />
@@ -148,7 +231,12 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.shortDesc}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, shortDesc: e.target.value }))}
+                    onChange={(e: { target: { value: any } }) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        shortDesc: e.target.value,
+                      }))
+                    }
                     placeholder="Brief description of the course"
                     rows={3}
                   />
@@ -160,7 +248,12 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e: { target: { value: any } }) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e: { target: { value: any } }) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
                     placeholder="Detailed description of the course content"
                     rows={6}
                     required
@@ -180,12 +273,17 @@ export default function CreateCoursePage() {
                 <div className="flex space-x-2">
                   <Input
                     value={newCategory}
-                    onChange={(e: { target: { value: SetStateAction<string> } }) => setNewCategory(e.target.value)}
+                    onChange={(e: {
+                      target: { value: SetStateAction<string> };
+                    }) => setNewCategory(e.target.value)}
                     placeholder="Add a category"
-                    onKeyPress={(e: { key: string; preventDefault: () => void }) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddCategory()
+                    onKeyPress={(e: {
+                      key: string;
+                      preventDefault: () => void;
+                    }) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCategory();
                       }
                     }}
                   />
@@ -197,7 +295,7 @@ export default function CreateCoursePage() {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                
+
                 {categories.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {categories.map((category) => (
@@ -237,11 +335,18 @@ export default function CreateCoursePage() {
                   </label>
                   <select
                     value={formData.level}
-                    onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value as CourseLevel }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        level: e.target.value as CourseLevel,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value={CourseLevel.BEGINNER}>Beginner</option>
-                    <option value={CourseLevel.INTERMEDIATE}>Intermediate</option>
+                    <option value={CourseLevel.INTERMEDIATE}>
+                      Intermediate
+                    </option>
                     <option value={CourseLevel.ADVANCED}>Advanced</option>
                   </select>
                 </div>
@@ -255,7 +360,13 @@ export default function CreateCoursePage() {
                       <input
                         type="radio"
                         checked={formData.isFree}
-                        onChange={() => setFormData(prev => ({ ...prev, isFree: true, price: 0 }))}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            isFree: true,
+                            price: 0,
+                          }))
+                        }
                         className="mr-2"
                       />
                       Free
@@ -264,7 +375,9 @@ export default function CreateCoursePage() {
                       <input
                         type="radio"
                         checked={!formData.isFree}
-                        onChange={() => setFormData(prev => ({ ...prev, isFree: false }))}
+                        onChange={() =>
+                          setFormData((prev) => ({ ...prev, isFree: false }))
+                        }
                         className="mr-2"
                       />
                       Paid
@@ -274,7 +387,12 @@ export default function CreateCoursePage() {
                         <Input
                           type="number"
                           value={formData.price}
-                          onChange={(e: { target: { value: string } }) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                          onChange={(e: { target: { value: string } }) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              price: parseFloat(e.target.value),
+                            }))
+                          }
                           placeholder="0.00"
                           step="0.01"
                           min="0"
@@ -299,21 +417,67 @@ export default function CreateCoursePage() {
                   <p className="text-sm text-gray-600 mb-2">
                     Upload course thumbnail
                   </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-gray-300"
-                  >
-                    Choose File
-                  </Button>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Supports: JPEG, PNG, WebP, GIF (Max 5MB)
+                  </p>
+
+                  <div className="flex flex-col items-center space-y-2">
+                    <input
+                      type="file"
+                      id="thumbnail-upload"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="thumbnail-upload"
+                      className="cursor-pointer"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-gray-300"
+                        disabled={isUploading}
+                        onClick={() =>
+                          document.getElementById("thumbnail-upload")?.click()
+                        }
+                      >
+                        {isUploading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        {isUploading ? "Uploading..." : "Choose File"}
+                      </Button>
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Click the button to select a file
+                    </p>
+                  </div>
                 </div>
+
                 {formData.thumbnail && (
                   <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Preview:
+                    </p>
                     <img
                       src={formData.thumbnail}
-                      alt="Course thumbnail"
+                      alt="Course thumbnail preview"
                       className="w-full h-32 object-cover rounded-lg"
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, thumbnail: "" }))
+                      }
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Remove
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -335,12 +499,12 @@ export default function CreateCoursePage() {
                     )}
                     Create Course
                   </Button>
-                  
+
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full border-gray-300"
-                    onClick={() => router.push('/admin/courses')}
+                    onClick={() => router.push("/admin/courses")}
                   >
                     Cancel
                   </Button>
@@ -351,5 +515,5 @@ export default function CreateCoursePage() {
         </div>
       </form>
     </div>
-  )
+  );
 }

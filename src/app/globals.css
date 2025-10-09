@@ -67,3 +67,15 @@ button{
 }
 
 
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+section, div {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+

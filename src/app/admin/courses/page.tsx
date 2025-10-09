@@ -1,9 +1,7 @@
-// src/app/admin/courses/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/hooks/useAuth'
 import { apiClient } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -21,7 +19,6 @@ import {
 import { CourseWithRelations, CourseStatus, CourseLevel } from '@/types'
 
 export default function CoursesPage() {
-  const { user } = useAuth()
   const router = useRouter()
   const [courses, setCourses] = useState<CourseWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -30,17 +27,25 @@ export default function CoursesPage() {
 
   useEffect(() => {
     fetchCourses()
-  }, [])
+  }, [statusFilter])
 
   const fetchCourses = async () => {
     try {
       const response = await apiClient.getCourses({ 
-        status: statusFilter === 'all' ? undefined : statusFilter as CourseStatus})
-      if (response.success) {
-        setCourses(response.data?.courses || [])
+        status: statusFilter === 'all' ? undefined : statusFilter as CourseStatus
+      })
+      
+      // Fixed: Handle the actual API response structure
+      if (response && Array.isArray(response)) {
+        setCourses(response)
+      } else if (response && response.data) {
+        setCourses(response.data.courses || response.data || [])
+      } else {
+        setCourses([])
       }
     } catch (error) {
       console.error('Failed to fetch courses:', error)
+      setCourses([])
     } finally {
       setIsLoading(false)
     }
@@ -50,15 +55,23 @@ export default function CoursesPage() {
     router.push('/admin/courses/create')
   }
 
+  const handleEditCourse = (courseId: string) => {
+    router.push(`/admin/courses/${courseId}/edit`)
+  }
+
+  const handleManageModules = (courseId: string) => {
+    router.push(`/admin/courses/${courseId}/modules`)
+  }
+
   const handleDeleteCourse = async (courseId: string) => {
     if (!confirm('Are you sure you want to delete this course?')) return
     
     try {
       await apiClient.deleteCourse(courseId)
       setCourses(courses.filter(course => course.id !== courseId))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete course:', error)
-      alert('Failed to delete course')
+      alert(error.message || 'Failed to delete course')
     }
   }
 
@@ -69,9 +82,9 @@ export default function CoursesPage() {
         isPublished: true 
       })
       await fetchCourses() // Refresh the list
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to publish course:', error)
-      alert('Failed to publish course')
+      alert(error.message || 'Failed to publish course')
     }
   }
 
@@ -154,7 +167,7 @@ export default function CoursesPage() {
               onClick={fetchCourses}
             >
               <Filter className="h-4 w-4 mr-2" />
-              Apply
+              Refresh
             </Button>
           </div>
         </CardContent>
@@ -169,61 +182,96 @@ export default function CoursesPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {filteredCourses.map((course) => (
-              <div
-                key={course.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <BookOpen className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="font-semibold text-gray-900">{course.title}</h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
-                        {course.status}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelColor(course.level)}`}>
-                        {course.level.toLowerCase()}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{course.description}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <span>{course._count?.enrollments || 0} students</span>
-                      <span>{course._count?.lessons || 0} lessons</span>
-                      <span>Created: {new Date(course.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" className="border-gray-300">
-                    <Eye className="h-4 w-4" />
+            {filteredCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900">No courses found</h3>
+                <p className="text-gray-500 mt-1">
+                  {searchTerm || statusFilter !== 'all' 
+                    ? 'Try adjusting your search or filters'
+                    : 'Get started by creating your first course'
+                  }
+                </p>
+                {!searchTerm && statusFilter === 'all' && (
+                  <Button 
+                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleAddNewCourse}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Course
                   </Button>
-                  <Button variant="outline" size="sm" className="border-gray-300">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  {course.status !== CourseStatus.PUBLISHED && (
+                )}
+              </div>
+            ) : (
+              filteredCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="font-semibold text-gray-900">{course.title}</h3>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(course.status)}`}>
+                          {course.status.toLowerCase()}
+                        </span>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getLevelColor(course.level)}`}>
+                          {course.level.toLowerCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                        {course.shortDesc || course.description}
+                      </p>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <span>{course._count?.enrollments || 0} students</span>
+                        <span>{course._count?.modules || 0} modules</span>
+                        <span>{course._count?.lessons || 0} lessons</span>
+                        <span>Created: {new Date(course.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="border-gray-300 text-green-600 hover:text-green-700"
-                      onClick={() => handlePublishCourse(course.id)}
+                      className="border-gray-300"
+                      onClick={() => handleManageModules(course.id)}
                     >
-                      Publish
+                      Modules
                     </Button>
-                  )}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="border-gray-300 text-red-600 hover:text-red-700"
-                    onClick={() => handleDeleteCourse(course.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-gray-300"
+                      onClick={() => handleEditCourse(course.id)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    {course.status !== CourseStatus.PUBLISHED && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-gray-300 text-green-600 hover:text-green-700"
+                        onClick={() => handlePublishCourse(course.id)}
+                      >
+                        Publish
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-gray-300 text-red-600 hover:text-red-700"
+                      onClick={() => handleDeleteCourse(course.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

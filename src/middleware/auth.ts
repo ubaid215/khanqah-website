@@ -1,4 +1,3 @@
-// src/middleware/auth.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { AuthMiddleware } from '@/controllers/AuthController'
 
@@ -34,8 +33,9 @@ export async function authMiddleware(req: NextRequest) {
   })
 }
 
+// Fixed requireAuth function for Next.js App Router
 export function requireAuth(handler: Function) {
-  return async (req: NextRequest, context?: any) => {
+  return async (req: NextRequest) => {
     const authResult = await AuthMiddleware.verifyAuth(req)
     if (authResult.error) {
       return NextResponse.json(
@@ -43,13 +43,16 @@ export function requireAuth(handler: Function) {
         { status: 401 }
       )
     }
-    return handler(req, context, authResult.user)
+    
+    // Call the handler with the request
+    return handler(req)
   }
 }
 
+// Fixed requireRole function for Next.js App Router
 export function requireRole(roles: string[]) {
   return (handler: Function) => {
-    return async (req: NextRequest, context?: any) => {
+    return async (req: NextRequest) => {
       const authResult = await AuthMiddleware.requireRole(roles)(req)
       if (authResult.error) {
         return NextResponse.json(
@@ -57,7 +60,7 @@ export function requireRole(roles: string[]) {
           { status: 403 }
         )
       }
-      return handler(req, context, authResult.user)
+      return handler(req)
     }
   }
 }

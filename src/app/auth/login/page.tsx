@@ -34,19 +34,19 @@ export default function LoginPage() {
   const redirect = searchParams.get('redirect') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
+  e.preventDefault()
+  setIsLoading(true)
+  setError('')
 
-    try {
-      await login(email, password)
-      router.push(redirect)
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials and try again.')
-    } finally {
-      setIsLoading(false)
-    }
+  try {
+    await login(email, password, rememberMe) 
+    router.push(redirect)
+  } catch (err: any) {
+    setError(err.message || 'Login failed. Please check your credentials and try again.')
+  } finally {
+    setIsLoading(false)
   }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">

@@ -6,7 +6,33 @@ import Link from 'next/link';
 import { Search, Menu, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Navbar = () => {
+// -------------------- TYPES --------------------
+type SubLink = {
+  name: string;
+  href: string;
+};
+
+type NavLinkType = {
+  name: string;
+  href: string;
+  submenu?: SubLink[];
+};
+
+// Props for desktop link
+interface NavLinkProps {
+  link: NavLinkType;
+  pathname: string;
+}
+
+// Props for mobile link
+interface MobileNavLinkProps {
+  link: NavLinkType;
+  pathname: string;
+  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+// -------------------- NAVBAR COMPONENT --------------------
+const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -19,19 +45,12 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
+  const navLinks: NavLinkType[] = [
     { name: 'Home', href: '/' },
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
     {
-      name: 'Articles',
-      href: '/articles',
-      submenu: [
-        { name: 'Tech Articles', href: '/articles/tech' },
-        { name: 'Design Articles', href: '/articles/design' },
-        { name: 'Business Articles', href: '/articles/business' },
-      ],
-    },
+      name: 'Articles', href: '/articles' },
     {
       name: 'Courses',
       href: '/courses',
@@ -67,7 +86,7 @@ const Navbar = () => {
               </motion.span>
             </Link>
 
-            {/* Search Icon */}
+            {/* Search and Mobile Menu */}
             <div className="flex items-center gap-4">
               <motion.button
                 whileHover={{ scale: 1.1 }}
@@ -136,7 +155,8 @@ const Navbar = () => {
   );
 };
 
-const NavLink = ({ link, pathname }) => {
+// -------------------- DESKTOP LINK --------------------
+const NavLink: React.FC<NavLinkProps> = ({ link, pathname }) => {
   const [isHovered, setIsHovered] = useState(false);
   const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
 
@@ -175,7 +195,7 @@ const NavLink = ({ link, pathname }) => {
               transition={{ duration: 0.2 }}
               className="absolute top-full left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-100 py-2 overflow-hidden"
             >
-              {link.submenu.map((item, idx) => (
+              {link.submenu.map((item: SubLink, idx: number) => (
                 <Link
                   key={item.name}
                   href={item.href}
@@ -198,7 +218,12 @@ const NavLink = ({ link, pathname }) => {
   );
 };
 
-const MobileNavLink = ({ link, pathname, setIsOpen }) => {
+// -------------------- MOBILE LINK --------------------
+const MobileNavLink: React.FC<MobileNavLinkProps> = ({
+  link,
+  pathname,
+  setIsOpen,
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
 
@@ -240,7 +265,7 @@ const MobileNavLink = ({ link, pathname, setIsOpen }) => {
             transition={{ duration: 0.2 }}
             className="ml-4 mt-1 space-y-1 overflow-hidden"
           >
-            {link.submenu.map((item) => (
+            {link.submenu.map((item: SubLink) => (
               <Link
                 key={item.name}
                 href={item.href}

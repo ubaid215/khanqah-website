@@ -67,28 +67,36 @@ export class CourseController {
     }
   }
 
-  static async getCourse(req: NextRequest, { params }: { params: { slug: string } }) {
-    try {
-      const course = await CourseModel.findBySlug(params.slug)
-      if (!course) {
-        return ApiResponse.error('Course not found', 404)
-      }
-
-      // Only show published courses to non-admins
-      const authResult = await AuthMiddleware.verifyAuth(req)
-      const isAdmin = authResult.user && 
-        [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role)
-
-      if (!course.isPublished && !isAdmin) {
-        return ApiResponse.error('Course not found', 404)
-      }
-
-      return ApiResponse.success(course, 'Course retrieved successfully')
-    } catch (error) {
-      console.error('Get course error:', error)
-      return ApiResponse.error('Internal server error')
+static async getCourse(req: NextRequest, { params }: { params: { id?: string; slug?: string } }) {
+  try {
+    let course;
+    
+    if (params.id) {
+      course = await CourseModel.findById(params.id);
+    } else if (params.slug) {
+      course = await CourseModel.findBySlug(params.slug);
+    } else {
+      return ApiResponse.error('Course ID or slug is required', 400);
     }
+    
+    if (!course) {
+      return ApiResponse.error('Course not found', 404);
+    }
+
+    const authResult = await AuthMiddleware.verifyAuth(req);
+    const isAdmin = authResult.user && 
+      [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
+
+    if (!course.isPublished && !isAdmin) {
+      return ApiResponse.error('Course not found', 404);
+    }
+
+    return ApiResponse.success(course, 'Course retrieved successfully');
+  } catch (error) {
+    console.error('Get course error:', error);
+    return ApiResponse.error('Internal server error');
   }
+}
 
   static async updateCourse(req: NextRequest, { params }: { params: { id: string } }) {
     try {
@@ -144,6 +152,36 @@ export class CourseController {
       return ApiResponse.error('Internal server error')
     }
   }
+
+ 
+ static async getAllCourses(req: NextRequest) {
+  try {
+    // Verify admin authentication
+    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 403)
+    }
+
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get('status') as CourseStatus | null
+    const level = searchParams.get('level') as CourseLevel | null
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '100')
+
+    // Get all courses with filters (including drafts and archived)
+    const result = await CourseModel.getAllCourses({
+      status,
+      level,
+      page,
+      limit
+    })
+
+    return ApiResponse.success(result, 'Courses retrieved successfully')
+  } catch (error) {
+    console.error('Get all courses error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
 
   static async enrollInCourse(req: NextRequest, { params }: { params: { id: string } }) {
     try {
@@ -283,4 +321,70 @@ export class CourseController {
       return ApiResponse.error('Internal server error')
     }
   }
+
+  // Module methods
+static async updateModule(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 403)
+    }
+
+    const data = await req.json()
+    const module = await CourseModel.updateModule(params.id, data)
+
+    return ApiResponse.success(module, 'Module updated successfully')
+  } catch (error) {
+    console.error('Update module error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
+
+static async deleteModule(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 403)
+    }
+
+    await CourseModel.deleteModule(params.id)
+    return ApiResponse.success(null, 'Module deleted successfully')
+  } catch (error) {
+    console.error('Delete module error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
+
+// Lesson methods
+static async updateLesson(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 403)
+    }
+
+    const data = await req.json()
+    const lesson = await CourseModel.updateLesson(params.id, data)
+
+    return ApiResponse.success(lesson, 'Lesson updated successfully')
+  } catch (error) {
+    console.error('Update lesson error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
+
+static async deleteLesson(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 403)
+    }
+
+    await CourseModel.deleteLesson(params.id)
+    return ApiResponse.success(null, 'Lesson deleted successfully')
+  } catch (error) {
+    console.error('Delete lesson error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
 }
