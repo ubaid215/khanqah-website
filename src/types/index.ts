@@ -130,6 +130,12 @@ export interface CourseFilters {
 }
 
 export interface CourseWithRelations {
+  avgRating: any
+  reviewCount: number
+  studentCount: number
+  instructor: any
+  objectives: boolean
+  requirements: boolean
   id: string
   title: string
   slug: string

@@ -30,8 +30,21 @@ import {
   BookmarkFilters,
   PaginatedResponse,
   UserRole,
-  AccountStatus
+  AccountStatus,
+  CourseLevel,
+  CourseStatus,
+  LessonType,
+  EnrollmentStatus
 } from '@/types'
+
+// Import Prisma types directly
+import { 
+  Module, 
+  Lesson, 
+  Enrollment, 
+  LessonProgress, 
+  Certificate 
+} from '@prisma/client'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
 
@@ -160,7 +173,7 @@ export class ApiClient {
     return this.request<T>(endpoint, { method: 'DELETE', ...options })
   }
 
-  // Auth methods
+  // ==================== AUTHENTICATION METHODS ====================
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await this.post<AuthResponse>('/auth/login', credentials)
     if (response.success && response.data?.token) {
@@ -190,7 +203,6 @@ export class ApiClient {
   }
 
   async getProfile(): Promise<ApiResponse<AuthUser>> {
-    // Return the full response to check success status
     return this.get<AuthUser>('/auth/profile')
   }
 
@@ -225,7 +237,7 @@ export class ApiClient {
     await this.put('/auth/change-password', passwordData)
   }
 
-  // User management (Admin only)
+  // ==================== USER MANAGEMENT METHODS ====================
   async getUsers(params?: { role?: UserRole; status?: AccountStatus; page?: number; limit?: number }) {
     const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : ''
     return this.get<PaginatedResponse<AuthUser[]>>(`/users${queryString}`)
@@ -255,38 +267,36 @@ export class ApiClient {
     await this.delete(`/users/${id}`)
   }
 
-  // Course methods
+  // ==================== COURSE METHODS ====================
   async getCourses(filters?: CourseFilters): Promise<ApiResponse<PaginatedResponse<CourseWithRelations[]>>> {
-  // Build query string properly, excluding undefined values
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses${queryString}`)
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses${queryString}`)
-}
-
 
   async getPublicCourses(filters?: Omit<CourseFilters, 'status' | 'isPublished'>): Promise<ApiResponse<PaginatedResponse<CourseWithRelations[]>>> {
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses/public${queryString}`)
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<CourseWithRelations[]>>(`/courses/public${queryString}`)
-}
 
   async getCourseById(id: string): Promise<CourseWithRelations> {
     const response = await this.get<CourseWithRelations>(`/courses/${id}`)
@@ -312,56 +322,202 @@ export class ApiClient {
     await this.delete(`/courses/${id}`)
   }
 
-  async enrollInCourse(courseId: string): Promise<any> {
-    const response = await this.post(`/courses/${courseId}/enroll`)
+  async publishCourse(id: string): Promise<CourseWithRelations> {
+    const response = await this.put<CourseWithRelations>(`/courses/${id}/publish`)
     return response.data!
   }
 
-  async updateLessonProgress(data: {
-    lessonId: string
-    isCompleted?: boolean
-    watchedDuration?: number
-    lastPosition?: number
-  }): Promise<any> {
-    const response = await this.put('/courses/progress', data)
+  async unpublishCourse(id: string): Promise<CourseWithRelations> {
+    const response = await this.put<CourseWithRelations>(`/courses/${id}/unpublish`)
     return response.data!
   }
 
-  async getUserEnrollments(): Promise<any[]> {
-    const response = await this.get<any[]>('/courses/enrollments/my')
+  // ==================== COURSE ENROLLMENT METHODS ====================
+  async enrollInCourse(courseId: string): Promise<Enrollment> {
+    const response = await this.post<Enrollment>(`/courses/${courseId}/enroll`)
     return response.data!
   }
 
-  // Article methods
-  async getArticles(filters?: ArticleFilters): Promise<ApiResponse<PaginatedResponse<ArticleWithRelations[]>>> {
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+ async getUserEnrollment(id: string): Promise<Enrollment | null> {
+  console.log("📘 [apiClient] getUserEnrollment() called with:", { id });
+
+  try {
+    console.log(`🔍 Sending request to: /courses/${id}/enrollment`);
+
+    const response = await this.get<Enrollment | null>(`/courses/${id}/enrollment`);
+
+    console.log("✅ Enrollment response received:", {
+      status: response?.status,
+      hasData: !!response?.data,
+      data: response?.data,
+    });
+
+    return response.data!;
+  } catch (error: any) {
+    console.error("💥 [apiClient] Error fetching user enrollment:", {
+      id,
+      message: error.message || error,
+      stack: error.stack,
+      response: error.response?.data,
+    });
+    throw error;
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles${queryString}`)
 }
+
+  async getUserEnrollments(): Promise<Enrollment[]> {
+    const response = await this.get<Enrollment[]>('/courses/enrollments/my')
+    return response.data!
+  }
+
+  async updateEnrollmentProgress(enrollmentId: string, progress: number): Promise<Enrollment> {
+    const response = await this.put<Enrollment>(`/enrollments/${enrollmentId}/progress`, { progress })
+    return response.data!
+  }
+
+  // ==================== MODULE METHODS ====================
+  async createModule(data: {
+    courseId: string;
+    title: string;
+    description?: string;
+    order: number;
+  }): Promise<Module> {
+    const response = await this.post<Module>('/courses/modules', data)
+    return response.data!
+  }
+
+  async updateModule(id: string, data: Partial<{
+    title?: string;
+    description?: string;
+    order?: number;
+  }>): Promise<Module> {
+    const response = await this.put<Module>(`/courses/modules/${id}`, data)
+    return response.data!
+  }
+
+  async deleteModule(id: string): Promise<void> {
+    await this.delete(`/courses/modules/${id}`)
+  }
+
+  // ==================== LESSON METHODS ====================
+  async createLesson(data: {
+    moduleId: string;
+    title: string;
+    description?: string;
+    type?: LessonType;
+    content?: string;
+    videoUrl?: string;
+    duration?: number;
+    order: number;
+    isFree?: boolean;
+  }): Promise<Lesson> {
+    const response = await this.post<Lesson>('/courses/lessons', data)
+    return response.data!
+  }
+
+  async updateLesson(id: string, data: Partial<{
+    title?: string;
+    description?: string;
+    type?: LessonType;
+    content?: string;
+    videoUrl?: string;
+    duration?: number;
+    order?: number;
+    isFree?: boolean;
+  }>): Promise<Lesson> {
+    const response = await this.put<Lesson>(`/courses/lessons/${id}`, data)
+    return response.data!
+  }
+
+  async deleteLesson(id: string): Promise<void> {
+    await this.delete(`/courses/lessons/${id}`)
+  }
+
+  // ==================== PROGRESS TRACKING METHODS ====================
+  async updateLessonProgress(data: {
+    lessonId: string;
+    isCompleted?: boolean;
+    watchedDuration?: number;
+    lastPosition?: number;
+  }): Promise<LessonProgress> {
+    const response = await this.put<LessonProgress>('/courses/progress', data)
+    return response.data!
+  }
+
+  async getLessonProgress(lessonId: string): Promise<LessonProgress | null> {
+    const response = await this.get<LessonProgress | null>(`/courses/progress/${lessonId}`)
+    return response.data!
+  }
+
+  async getCourseProgress(courseId: string): Promise<{
+    completedLessons: number;
+    totalLessons: number;
+    progress: number;
+    enrollment?: Enrollment;
+  }> {
+    const response = await this.get<{
+      completedLessons: number;
+      totalLessons: number;
+      progress: number;
+      enrollment?: Enrollment;
+    }>(`/courses/${courseId}/progress`)
+    return response.data!
+  }
+
+  // ==================== CERTIFICATE METHODS ====================
+  async createCertificate(data: {
+    courseId: string;
+    courseTitle: string;
+    pdfUrl?: string;
+  }): Promise<Certificate> {
+    const response = await this.post<Certificate>('/certificates', data)
+    return response.data!
+  }
+
+  async getUserCertificates(): Promise<Certificate[]> {
+    const response = await this.get<Certificate[]>('/certificates/my')
+    return response.data!
+  }
+
+  async getCertificateById(id: string): Promise<Certificate> {
+    const response = await this.get<Certificate>(`/certificates/${id}`)
+    return response.data!
+  }
+
+  async downloadCertificate(id: string): Promise<{ downloadUrl: string }> {
+    const response = await this.post<{ downloadUrl: string }>(`/certificates/${id}/download`)
+    return response.data!
+  }
+
+  // ==================== ARTICLE METHODS ====================
+  async getArticles(filters?: ArticleFilters): Promise<ApiResponse<PaginatedResponse<ArticleWithRelations[]>>> {
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles${queryString}`)
+  }
 
   async getPublicArticles(filters?: Omit<ArticleFilters, 'status'>): Promise<ApiResponse<PaginatedResponse<ArticleWithRelations[]>>> {
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles/public${queryString}`)
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<ArticleWithRelations[]>>(`/articles/public${queryString}`)
-}
 
   async getArticleById(id: string): Promise<ArticleWithRelations> {
     const response = await this.get<ArticleWithRelations>(`/articles/${id}`)
@@ -403,36 +559,36 @@ export class ApiClient {
     return response.data!
   }
 
-  // Book methods
+  // ==================== BOOK METHODS ====================
   async getBooks(filters?: BookFilters): Promise<ApiResponse<PaginatedResponse<BookWithRelations[]>>> {
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<BookWithRelations[]>>(`/books${queryString}`)
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<BookWithRelations[]>>(`/books${queryString}`)
-}
 
-async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse<PaginatedResponse<BookWithRelations[]>>> {
-  const params = new URLSearchParams()
-  
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, String(value))
-      }
-    })
+  async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse<PaginatedResponse<BookWithRelations[]>>> {
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+    return this.get<PaginatedResponse<BookWithRelations[]>>(`/books/public${queryString}`)
   }
-  
-  const queryString = params.toString() ? `?${params.toString()}` : ''
-  return this.get<PaginatedResponse<BookWithRelations[]>>(`/books/public${queryString}`)
-}
 
   async getBookById(id: string): Promise<BookWithRelations> {
     const response = await this.get<BookWithRelations>(`/books/${id}`)
@@ -474,9 +630,19 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
     return response.data!
   }
 
-  // Question & Answer methods
+  // ==================== QUESTION & ANSWER METHODS ====================
   async getQuestions(filters?: QuestionFilters): Promise<ApiResponse<PaginatedResponse<QuestionWithRelations[]>>> {
-    const queryString = filters ? `?${new URLSearchParams(filters as any).toString()}` : ''
+    const params = new URLSearchParams()
+    
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value))
+        }
+      })
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
     return this.get<PaginatedResponse<QuestionWithRelations[]>>(`/questions${queryString}`)
   }
 
@@ -513,9 +679,15 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
     await this.delete(`/answers/${answerId}`)
   }
 
-  // Bookmark methods
+  // ==================== BOOKMARK METHODS ====================
   async getBookmarks(filters?: BookmarkFilters): Promise<BookmarkWithRelations[]> {
-    const queryString = filters?.type ? `?type=${filters.type}` : ''
+    const params = new URLSearchParams()
+    
+    if (filters?.type) {
+      params.append('type', filters.type)
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
     const response = await this.get<BookmarkWithRelations[]>(`/bookmarks${queryString}`)
     return response.data!
   }
@@ -526,7 +698,15 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
   }
 
   async checkBookmark(data: Omit<CreateBookmarkData, 'userId'>): Promise<{ isBookmarked: boolean }> {
-    const queryString = `?${new URLSearchParams(data as any).toString()}`
+    const params = new URLSearchParams()
+    
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
     const response = await this.get<{ isBookmarked: boolean }>(`/bookmarks/check${queryString}`)
     return response.data!
   }
@@ -536,19 +716,96 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
   }
 
   async deleteBookmarkByResource(data: Omit<CreateBookmarkData, 'userId'>): Promise<void> {
-    const response = await this.delete('/bookmarks/resource', {
+    // Fixed the comparison issue by properly handling the data
+    await this.delete('/bookmarks/resource', {
       body: JSON.stringify(data)
     })
-    return response.data!
   }
 
   async getBookmarkCount(data: Omit<CreateBookmarkData, 'userId' | 'type'>): Promise<{ count: number }> {
-    const queryString = `?${new URLSearchParams(data as any).toString()}`
+    const params = new URLSearchParams()
+    
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value))
+      }
+    })
+    
+    const queryString = params.toString() ? `?${params.toString()}` : ''
     const response = await this.get<{ count: number }>(`/bookmarks/count${queryString}`)
     return response.data!
   }
 
-  // Utility methods
+  // ==================== UTILITY METHODS ====================
+
+// Add this method to handle file uploads with progress
+async uploadFileWithProgress(
+  file: File, 
+  onProgress?: (progress: number) => void
+): Promise<{ url: string; filename: string; size: number; mimetype: string }> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const token = this.getStoredToken()
+  
+  if (!token) {
+    throw new ApiError('Authentication token not found', 401)
+  }
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    
+    // Track upload progress
+    if (onProgress) {
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = (event.loaded / event.total) * 100
+          onProgress(Math.round(progress))
+        }
+      })
+    }
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText)
+          if (response.success) {
+            resolve(response.data)
+          } else {
+            reject(new ApiError(response.error || 'Upload failed', xhr.status))
+          }
+        } catch (error) {
+          reject(new ApiError('Failed to parse upload response', xhr.status))
+        }
+      } else {
+        // Try to parse error response
+        try {
+          const errorResponse = JSON.parse(xhr.responseText)
+          reject(new ApiError(errorResponse.error || 'Upload failed', xhr.status))
+        } catch {
+          reject(new ApiError('Upload failed', xhr.status))
+        }
+      }
+    })
+
+    xhr.addEventListener('error', () => {
+      reject(new ApiError('Network error during upload', 0))
+    })
+
+    xhr.addEventListener('abort', () => {
+      reject(new ApiError('Upload cancelled', 0))
+    })
+
+    xhr.open('POST', `${API_BASE_URL}/upload`)
+    
+    // Set authorization header
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    
+    xhr.send(formData)
+  })
+}
+
+
   async uploadFile(file: File): Promise<{ url: string; filename: string; size: number; mimetype: string }> {
     const formData = new FormData()
     formData.append('file', file)
@@ -572,8 +829,15 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
   }
 
   async search(query: string, type?: string): Promise<any> {
-    const queryString = `?q=${encodeURIComponent(query)}${type ? `&type=${type}` : ''}`
-    const response = await this.get(`/search${queryString}`)
+    const params = new URLSearchParams()
+    params.append('q', query)
+    
+    if (type) {
+      params.append('type', type)
+    }
+    
+    const queryString = params.toString()
+    const response = await this.get(`/search?${queryString}`)
     return response.data!
   }
 
@@ -585,6 +849,31 @@ async getPublicBooks(filters?: Omit<BookFilters, 'status'>): Promise<ApiResponse
   async getHealth(): Promise<any> {
     const response = await this.get('/health')
     return response.data!
+  }
+
+  // ==================== CATEGORY METHODS ====================
+  async getCategories(): Promise<any[]> {
+    const response = await this.get<any[]>('/categories')
+    return response.data!
+  }
+
+  async getCategoryBySlug(slug: string): Promise<any> {
+    const response = await this.get<any>(`/categories/slug/${slug}`)
+    return response.data!
+  }
+
+  async createCategory(data: { name: string; slug: string; description?: string; icon?: string }): Promise<any> {
+    const response = await this.post<any>('/categories', data)
+    return response.data!
+  }
+
+  async updateCategory(id: string, data: Partial<{ name: string; slug: string; description?: string; icon?: string }>): Promise<any> {
+    const response = await this.put<any>(`/categories/${id}`, data)
+    return response.data!
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    await this.delete(`/categories/${id}`)
   }
 }
 

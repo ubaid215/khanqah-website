@@ -1,4 +1,3 @@
-// src/models/Course.ts
 import { prisma } from "@/lib/prisma";
 import {
   Course,
@@ -6,7 +5,7 @@ import {
   CourseStatus,
   Module,
   Lesson,
-  LessonType, // Added missing import
+  LessonType,
   Enrollment,
   LessonProgress,
   Certificate,
@@ -37,6 +36,7 @@ export interface UpdateCourseData {
   isFree?: boolean;
   isPublished?: boolean;
   publishedAt?: Date | null;
+  categoryIds?: string[]; // Add this line
 }
 
 export interface CreateModuleData {
@@ -69,6 +69,7 @@ export type CourseWithRelations = Course & {
 };
 
 export class CourseModel {
+  
   // Course methods
   static async create(data: CreateCourseData): Promise<CourseWithRelations> {
     const { categoryIds, ...courseData } = data;
@@ -76,7 +77,7 @@ export class CourseModel {
     return await prisma.course.create({
       data: {
         ...courseData,
-        categories: categoryIds
+        categories: categoryIds && categoryIds.length > 0
           ? {
               create: categoryIds.map((categoryId) => ({
                 category: { connect: { id: categoryId } },
@@ -97,11 +98,11 @@ export class CourseModel {
   }
 
   static async getAllCourses(options: {
-    status?: CourseStatus | null;
-    level?: CourseLevel | null;
+    status?: CourseStatus;
+    level?: CourseLevel;
     page?: number;
     limit?: number;
-  }) {
+  } = {}) {
     const { status, level, page = 1, limit = 100 } = options;
     const skip = (page - 1) * limit;
 
@@ -268,26 +269,43 @@ export class CourseModel {
   }
 
   static async updateCourse(
-    id: string,
-    data: UpdateCourseData
-  ): Promise<CourseWithRelations> {
-    return await prisma.course.update({
-      where: { id },
-      data: {
-        ...data,
-        publishedAt: data.isPublished ? new Date() : data.publishedAt,
-      },
-      include: {
-        categories: {
-          include: { category: true },
-        },
-        modules: {
-          include: { lessons: true },
-          orderBy: { order: "asc" },
-        },
-      },
-    });
+  id: string,
+  data: UpdateCourseData
+): Promise<CourseWithRelations> {
+  const { categoryIds, ...updateData } = data;
+
+  // Build the update data
+  const prismaUpdateData: any = {
+    ...updateData,
+    publishedAt: updateData.isPublished ? new Date() : updateData.publishedAt,
+  };
+
+  // Handle category updates if categoryIds are provided
+  if (categoryIds !== undefined) {
+    prismaUpdateData.categories = {
+      // Delete all existing category connections
+      deleteMany: {},
+      // Create new category connections
+      create: categoryIds.map(categoryId => ({
+        category: { connect: { id: categoryId } }
+      }))
+    };
   }
+
+  return await prisma.course.update({
+    where: { id },
+    data: prismaUpdateData,
+    include: {
+      categories: {
+        include: { category: true },
+      },
+      modules: {
+        include: { lessons: true },
+        orderBy: { order: "asc" },
+      },
+    },
+  });
+}
 
   static async deleteCourse(id: string): Promise<Course> {
     return await prisma.course.delete({
@@ -295,22 +313,21 @@ export class CourseModel {
     });
   }
 
-  // REMOVED DUPLICATE METHOD - Using this single implementation:
-  static async getPublishedCourses(options?: {
+  static async getPublishedCourses(options: {
     categorySlug?: string;
     level?: CourseLevel;
     page?: number;
     limit?: number;
-  }) {
-    const page = options?.page || 1;
-    const limit = options?.limit || 10;
+  } = {}) {
+    const page = options.page || 1;
+    const limit = options.limit || 10;
     const skip = (page - 1) * limit;
 
     const where: Prisma.CourseWhereInput = {
       isPublished: true,
       status: CourseStatus.PUBLISHED,
-      ...(options?.level && { level: options.level }),
-      ...(options?.categorySlug && {
+      ...(options.level && { level: options.level }),
+      ...(options.categorySlug && {
         categories: {
           some: {
             category: {
@@ -424,19 +441,19 @@ export class CourseModel {
   }
 
   // Enrollment methods
-  static async enrollUser(
-    courseId: string,
-    userId: string
-  ): Promise<Enrollment> {
-    return await prisma.enrollment.create({
-      data: {
-        courseId,
-        userId,
-      },
-    });
-  }
+static async enrollUser(
+  courseId: string,
+  userId: string
+): Promise<Enrollment> {
+  return await prisma.enrollment.create({
+    data: {
+      courseId,
+      userId,
+    },
+  });
+}
 
-  static async getUserEnrollment(
+ static async getUserEnrollment(
     courseId: string,
     userId: string
   ): Promise<Enrollment | null> {
@@ -449,6 +466,81 @@ export class CourseModel {
       },
     });
   }
+
+
+static async getUserEnrollments(userId: string) {
+  // First get enrollments with course details
+  const enrollments = await prisma.enrollment.findMany({
+    where: { 
+      userId 
+    },
+    include: {
+      course: {
+        include: {
+          modules: {
+            include: {
+              lessons: {
+                select: {
+                  id: true,
+                  title: true,
+                  duration: true
+                },
+                orderBy: { order: "asc" }
+              }
+            },
+            orderBy: { order: "asc" }
+          },
+          categories: {
+            include: { category: true }
+          }
+        }
+      }
+    },
+    orderBy: {
+      enrolledAt: "desc"
+    }
+  });
+
+  // Then get completed lessons count for each enrollment
+  const enrollmentsWithProgress = await Promise.all(
+    enrollments.map(async (enrollment) => {
+      // Get total lessons in the course
+      const totalLessons = await prisma.lesson.count({
+        where: {
+          module: {
+            courseId: enrollment.courseId
+          }
+        }
+      });
+
+      // Get completed lessons for this user in this course
+      const completedLessons = await prisma.lessonProgress.count({
+        where: {
+          userId: userId,
+          isCompleted: true,
+          lesson: {
+            module: {
+              courseId: enrollment.courseId
+            }
+          }
+        }
+      });
+
+      // Calculate progress percentage
+      const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+      return {
+        ...enrollment,
+        _count: {
+          completedLessons
+        },
+        progress // Add progress to enrollment
+      };
+    })
+  );
+
+  return enrollmentsWithProgress;
+}
 
   static async updateEnrollmentProgress(
     enrollmentId: string,
@@ -502,6 +594,17 @@ export class CourseModel {
       },
     });
   }
+
+  static async getLessonProgress(lessonId: string, userId: string): Promise<LessonProgress | null> {
+  return await prisma.lessonProgress.findUnique({
+    where: {
+      userId_lessonId: {
+        userId,
+        lessonId,
+      },
+    },
+  })
+}
 
   // Certificate methods
   static async createCertificate(data: {

@@ -1,3 +1,5 @@
+// src/app/api/courses/lessons/[id]/route.ts
+
 import { NextRequest } from 'next/server'
 import { CourseController } from '@/controllers/CourseController'
 

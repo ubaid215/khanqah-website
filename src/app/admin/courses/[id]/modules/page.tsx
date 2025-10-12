@@ -1,8 +1,10 @@
+// src/app/admin/courses/[id]/modules/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api'
+import { getAuthToken } from '@/lib/edge-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -81,11 +83,12 @@ export default function CourseModulesPage() {
       setIsLoading(true)
       const response = await apiClient.getCourseById(courseId)
       
-      if (response && (response.data || response)) {
-        const courseData = response.data || response
-        setCourse(courseData)
+      // Handle ApiResponse format
+      if (response && typeof response === 'object' && 'data' in response) {
+        setCourse(response.data as CourseWithRelations)
       } else {
-        throw new Error('Course not found')
+        // If it's already the course data directly
+        setCourse(response as CourseWithRelations)
       }
     } catch (error) {
       console.error('Failed to fetch course:', error)
@@ -106,13 +109,30 @@ export default function CourseModulesPage() {
         order: moduleForm.order
       })
       
-      if (response && !response.error) {
-        setShowModuleForm(false)
-        setModuleForm({ title: '', description: '', order: 0 })
-        setEditingModule(null)
-        await fetchCourse()
+      // Handle response properly
+      if (response && typeof response === 'object') {
+        // Check if it's an ApiResponse with success property
+        if ('success' in response) {
+          if (!response.success) {
+            // Handle error from ApiResponse
+            const errorMessage = (response as any).error || 'Failed to create module'
+            throw new Error(errorMessage)
+          }
+          // Success case for ApiResponse
+          setShowModuleForm(false)
+          setModuleForm({ title: '', description: '', order: 0 })
+          setEditingModule(null)
+          await fetchCourse()
+        } else {
+          // Direct success case (raw module data)
+          setShowModuleForm(false)
+          setModuleForm({ title: '', description: '', order: 0 })
+          setEditingModule(null)
+          await fetchCourse()
+        }
       } else {
-        throw new Error(response?.error || 'Failed to create module')
+        // Unknown response format
+        throw new Error('Unexpected response format')
       }
     } catch (error: any) {
       console.error('Failed to create module:', error)
@@ -132,13 +152,25 @@ export default function CourseModulesPage() {
         order: moduleForm.order
       })
       
-      if (response && !response.error) {
-        setShowModuleForm(false)
-        setModuleForm({ title: '', description: '', order: 0 })
-        setEditingModule(null)
-        await fetchCourse()
+      // Handle response properly
+      if (response && typeof response === 'object') {
+        if ('success' in response) {
+          if (!response.success) {
+            const errorMessage = (response as any).error || 'Failed to update module'
+            throw new Error(errorMessage)
+          }
+          setShowModuleForm(false)
+          setModuleForm({ title: '', description: '', order: 0 })
+          setEditingModule(null)
+          await fetchCourse()
+        } else {
+          setShowModuleForm(false)
+          setModuleForm({ title: '', description: '', order: 0 })
+          setEditingModule(null)
+          await fetchCourse()
+        }
       } else {
-        throw new Error(response?.error || 'Failed to update module')
+        throw new Error('Unexpected response format')
       }
     } catch (error: any) {
       console.error('Failed to update module:', error)
@@ -149,9 +181,19 @@ export default function CourseModulesPage() {
   const handleCreateLesson = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!selectedModuleId) return
+    if (!selectedModuleId) {
+      alert('Please select a module first')
+      return
+    }
     
     try {
+      console.log('Creating lesson with data:', {
+        moduleId: selectedModuleId,
+        title: lessonForm.title,
+        type: lessonForm.type,
+        order: lessonForm.order
+      })
+
       const response = await apiClient.createLesson({
         moduleId: selectedModuleId,
         title: lessonForm.title,
@@ -164,12 +206,27 @@ export default function CourseModulesPage() {
         isFree: lessonForm.isFree
       })
       
-      if (response && !response.error) {
-        setShowLessonForm(false)
-        resetLessonForm()
-        await fetchCourse()
+      console.log('Create lesson response:', response)
+      
+      // Handle response properly
+      if (response && typeof response === 'object') {
+        if ('success' in response) {
+          if (!response.success) {
+            const errorMessage = (response as any).error || 'Failed to create lesson'
+            throw new Error(errorMessage)
+          }
+          setShowLessonForm(false)
+          resetLessonForm()
+          await fetchCourse()
+          alert('Lesson created successfully!')
+        } else {
+          setShowLessonForm(false)
+          resetLessonForm()
+          await fetchCourse()
+          alert('Lesson created successfully!')
+        }
       } else {
-        throw new Error(response?.error || 'Failed to create lesson')
+        throw new Error('Unexpected response format')
       }
     } catch (error: any) {
       console.error('Failed to create lesson:', error)
@@ -194,12 +251,25 @@ export default function CourseModulesPage() {
         isFree: lessonForm.isFree
       })
       
-      if (response && !response.error) {
-        setShowLessonForm(false)
-        resetLessonForm()
-        await fetchCourse()
+      // Handle response properly
+      if (response && typeof response === 'object') {
+        if ('success' in response) {
+          if (!response.success) {
+            const errorMessage = (response as any).error || 'Failed to update lesson'
+            throw new Error(errorMessage)
+          }
+          setShowLessonForm(false)
+          resetLessonForm()
+          await fetchCourse()
+          alert('Lesson updated successfully!')
+        } else {
+          setShowLessonForm(false)
+          resetLessonForm()
+          await fetchCourse()
+          alert('Lesson updated successfully!')
+        }
       } else {
-        throw new Error(response?.error || 'Failed to update lesson')
+        throw new Error('Unexpected response format')
       }
     } catch (error: any) {
       console.error('Failed to update lesson:', error)
@@ -213,6 +283,7 @@ export default function CourseModulesPage() {
     try {
       await apiClient.deleteModule(moduleId)
       await fetchCourse()
+      alert('Module deleted successfully!')
     } catch (error: any) {
       console.error('Failed to delete module:', error)
       alert(error.message || 'Failed to delete module')
@@ -225,6 +296,7 @@ export default function CourseModulesPage() {
     try {
       await apiClient.deleteLesson(lessonId)
       await fetchCourse()
+      alert('Lesson deleted successfully!')
     } catch (error: any) {
       console.error('Failed to delete lesson:', error)
       alert(error.message || 'Failed to delete lesson')
@@ -258,9 +330,24 @@ export default function CourseModulesPage() {
   }
 
   const handleAddLesson = (moduleId: string) => {
+    console.log('Adding lesson to module:', moduleId)
     setSelectedModuleId(moduleId)
     setEditingLesson(null)
-    resetLessonForm()
+    
+    // Set default order based on existing lessons in the module
+    const module = course?.modules?.find(m => m.id === moduleId)
+    const lessonCount = module?.lessons?.length || 0
+    setLessonForm(prev => ({
+      ...prev,
+      order: lessonCount,
+      title: '',
+      description: '',
+      content: '',
+      videoUrl: '',
+      duration: 0,
+      isFree: false
+    }))
+    
     setShowLessonForm(true)
   }
 
@@ -284,14 +371,64 @@ export default function CourseModulesPage() {
     setUploadProgress(0)
     
     try {
-      const uploadResult = await apiClient.uploadFile(file, (progress) => {
-        setUploadProgress(progress)
-      })
+      // Use the new upload method with progress
+      const uploadResult = await apiClient.uploadFileWithProgress(
+        file, 
+        (progress) => {
+          setUploadProgress(progress)
+        }
+      )
       
       setLessonForm(prev => ({ ...prev, videoUrl: uploadResult.url }))
+      alert('Video uploaded successfully!')
     } catch (error: any) {
       console.error('Upload failed:', error)
       alert(error.message || 'Video upload failed')
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
+  // Alternative upload method using fetch directly (if API client doesn't work)
+  const handleVideoUploadDirect = async (file: File) => {
+    setUploading(true)
+    setUploadProgress(0)
+    
+    try {
+      const token = getAuthToken()
+      
+      if (!token) {
+        alert('Please log in to upload files')
+        setUploading(false)
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setLessonForm(prev => ({
+          ...prev,
+          videoUrl: result.data.url
+        }))
+        alert('Video uploaded successfully!')
+      } else {
+        throw new Error(result.error || 'Upload failed')
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error)
+      alert(error.message || 'Upload failed. Please try again.')
     } finally {
       setUploading(false)
       setUploadProgress(0)
@@ -379,7 +516,11 @@ export default function CourseModulesPage() {
         <Button
           onClick={() => {
             setEditingModule(null)
-            setModuleForm({ title: '', description: '', order: course.modules?.length || 0 })
+            setModuleForm({ 
+              title: '', 
+              description: '', 
+              order: course.modules?.length || 0 
+            })
             setShowModuleForm(true)
           }}
           className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -471,6 +612,12 @@ export default function CourseModulesPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={editingLesson ? handleUpdateLesson : handleCreateLesson} className="space-y-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Module:</strong> {course.modules?.find(m => m.id === selectedModuleId)?.title || 'Unknown Module'}
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Lesson Title *
@@ -545,7 +692,10 @@ export default function CourseModulesPage() {
                               alert('Video file must be less than 50MB')
                               return
                             }
-                            handleVideoUpload(file)
+                            // Try API client first, fallback to direct upload
+                            handleVideoUpload(file).catch(() => {
+                              handleVideoUploadDirect(file)
+                            })
                           }
                         }}
                         className="hidden"
@@ -649,7 +799,7 @@ export default function CourseModulesPage() {
                 <Button 
                   type="submit" 
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={!lessonForm.title.trim() || uploading}
+                  disabled={!lessonForm.title.trim() || uploading || !selectedModuleId}
                 >
                   {uploading ? (
                     <>

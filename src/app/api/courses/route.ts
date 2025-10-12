@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 import { CourseController } from '@/controllers/CourseController'
 import { requireAdmin } from '@/middleware/auth'
 
-export const GET = async (req: NextRequest) => {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   
   // Public access to published courses only
@@ -12,9 +12,12 @@ export const GET = async (req: NextRequest) => {
   }
   
   // Admin access to all courses (including drafts and archived)
-  return requireAdmin(CourseController.getAllCourses)(req)
+  return requireAdmin(async (r) => CourseController.getAllCourses(r))(
+    req,
+    { params: {} }
+  )
 }
 
 export const POST = requireAdmin(async (req: NextRequest) => {
-  return await CourseController.createCourse(req)
+  return CourseController.createCourse(req)
 })

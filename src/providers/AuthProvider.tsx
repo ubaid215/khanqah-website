@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
+  register: (data: { name: string; email: string; password: string; username?: string }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -20,7 +21,6 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
-// Helper functions for localStorage
 const storage = {
   getUser: (): AuthUser | null => {
     if (typeof window === 'undefined') return null
@@ -45,49 +45,53 @@ const storage = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-
-  // Initialize from localStorage on mount
-  useEffect(() => {
-    const savedUser = storage.getUser()
-    if (savedUser) {
-      setUser(savedUser)
-    }
-    setIsLoading(false)
-  }, [])
-
   const isAuthenticated = !!user
 
-const refreshUser = useCallback(async () => {
-  try {
-    const response = await apiClient.getProfile()
-    if (response.success && response.data) {
-      setUser(response.data)
-      // Store user based on current storage type
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-      if (token === localStorage.getItem('token')) {
-        localStorage.setItem('user', JSON.stringify(response.data))
-      } else {
-        sessionStorage.setItem('user', JSON.stringify(response.data))
+  // ✅ New: register function
+  const register = async (data: { name: string; email: string; password: string; username?: string }) => {
+    setIsLoading(true)
+    try {
+      const response = await apiClient.register(data) // 🔹 Call your API route here
+      if (response.user) {
+        setUser(response.user)
+        storage.setUser(response.user)
       }
-      return true
+    } catch (error) {
+      storage.clear()
+      throw error
+    } finally {
+      setIsLoading(false)
     }
-    return false
-  } catch (error: any) {
-    console.error('Failed to refresh user:', error)
-    
-    // Clear all storage on auth errors
-    if (error.status === 401 || error.status === 403) {
-      setUser(null)
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('user')
-        localStorage.removeItem('token')
-        sessionStorage.removeItem('user')
-        sessionStorage.removeItem('token')
-      }
-    }
-    return false
   }
-}, [])
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await apiClient.getProfile()
+      if (response.success && response.data) {
+        setUser(response.data)
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+        if (token === localStorage.getItem('token')) {
+          localStorage.setItem('user', JSON.stringify(response.data))
+        } else {
+          sessionStorage.setItem('user', JSON.stringify(response.data))
+        }
+        return true
+      }
+      return false
+    } catch (error: any) {
+      console.error('Failed to refresh user:', error)
+      if (error.status === 401 || error.status === 403) {
+        setUser(null)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('user')
+          localStorage.removeItem('token')
+          sessionStorage.removeItem('user')
+          sessionStorage.removeItem('token')
+        }
+      }
+      return false
+    }
+  }, [])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
@@ -114,19 +118,17 @@ const refreshUser = useCallback(async () => {
     }
   }
 
-  // Check authentication status on mount
   useEffect(() => {
     let mounted = true
 
     const checkAuth = async () => {
       const token = localStorage.getItem('token')
-      
+
       if (!token) {
         setIsLoading(false)
         return
       }
 
-      // If we have a user in localStorage but no token was set, clear user
       if (user && !token) {
         setUser(null)
         storage.clear()
@@ -165,15 +167,12 @@ const refreshUser = useCallback(async () => {
     isLoading,
     isAuthenticated,
     login,
+    register, // ✅ Added here
     logout,
     refreshUser,
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

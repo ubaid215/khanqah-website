@@ -1,23 +1,43 @@
+// src/app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/middleware/auth'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { AuthMiddleware } from '@/controllers/AuthController'
 
-export const POST = requireAuth(async (req: NextRequest, context: any, user?: any) => {
+export async function POST(req: NextRequest) {
   console.log('🟢 [UPLOAD_ROUTE] Request received');
 
   try {
-    // Check authentication
-    if (!user) {
-      console.warn('🔴 [UPLOAD_ROUTE] Unauthorized attempt to upload file');
-      return Response.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
+    let userId: string | null = null
+    let userEmail: string | null = null
+    let userRole: string | null = null
 
-    console.log(`👤 [UPLOAD_ROUTE] Authenticated user: ${user.email} (role: ${user.role}, id: ${user.id})`)
+    // Try to get user from headers first (set by middleware)
+    userId = req.headers.get('x-user-id')
+    userEmail = req.headers.get('x-user-email')
+    userRole = req.headers.get('x-user-role')
+
+    // If headers are not set, try to authenticate directly
+    if (!userId || !userEmail) {
+      console.log('🔄 [UPLOAD_ROUTE] No user headers found, authenticating directly...')
+      const authResult = await AuthMiddleware.verifyAuth(req)
+      
+      if (authResult.error || !authResult.user) {
+        console.warn('🔴 [UPLOAD_ROUTE] Direct authentication failed:', authResult.error)
+        return NextResponse.json(
+          { success: false, error: 'Authentication required' },
+          { status: 401 }
+        )
+      }
+
+      userId = authResult.user.id
+      userEmail = authResult.user.email
+      userRole = authResult.user.role
+      console.log(`👤 [UPLOAD_ROUTE] Direct authentication successful: ${userEmail}`)
+    } else {
+      console.log(`👤 [UPLOAD_ROUTE] User from headers: ${userEmail} (role: ${userRole}, id: ${userId})`)
+    }
 
     // Parse form data
     console.log('📦 [UPLOAD_ROUTE] Extracting form data...')
@@ -26,7 +46,7 @@ export const POST = requireAuth(async (req: NextRequest, context: any, user?: an
 
     if (!file) {
       console.warn('⚠️ [UPLOAD_ROUTE] No file provided in form data')
-      return Response.json(
+      return NextResponse.json(
         { success: false, error: 'No file provided' },
         { status: 400 }
       )
@@ -35,21 +55,35 @@ export const POST = requireAuth(async (req: NextRequest, context: any, user?: an
     console.log(`🧾 [UPLOAD_ROUTE] File received: ${file.name} (${file.type}, ${file.size} bytes)`)
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    const allowedTypes = [
+      'image/jpeg', 
+      'image/jpg', 
+      'image/png', 
+      'image/webp', 
+      'image/gif',
+      'video/mp4',
+      'video/mpeg',
+      'video/ogg',
+      'video/webm',
+      'video/quicktime',
+      'application/pdf'
+    ]
+    
     if (!allowedTypes.includes(file.type)) {
       console.warn(`⚠️ [UPLOAD_ROUTE] Invalid file type: ${file.type}`)
-      return Response.json(
-        { success: false, error: 'Invalid file type. Only images are allowed.' },
+      return NextResponse.json(
+        { success: false, error: 'Invalid file type. Only images, videos, and PDFs are allowed.' },
         { status: 400 }
       )
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024
+    // Validate file size (max 50MB for videos, 5MB for images/PDFs)
+    const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 5 * 1024 * 1024
     if (file.size > maxSize) {
       console.warn(`⚠️ [UPLOAD_ROUTE] File too large: ${file.size} bytes`)
-      return Response.json(
-        { success: false, error: 'File size must be less than 5MB' },
+      const maxSizeMB = maxSize / (1024 * 1024)
+      return NextResponse.json(
+        { success: false, error: `File size must be less than ${maxSizeMB}MB` },
         { status: 400 }
       )
     }
@@ -70,7 +104,7 @@ export const POST = requireAuth(async (req: NextRequest, context: any, user?: an
     // Generate unique filename
     const timestamp = Date.now()
     const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const filename = `${user.id}-${timestamp}-${originalName}`
+    const filename = `${userId}-${timestamp}-${originalName}`
     const filepath = join(uploadsDir, filename)
     console.log(`🧩 [UPLOAD_ROUTE] Generated filename: ${filename}`)
 
@@ -84,8 +118,8 @@ export const POST = requireAuth(async (req: NextRequest, context: any, user?: an
     console.log(`🌍 [UPLOAD_ROUTE] Public file URL: ${fileUrl}`)
 
     // Success response
-    console.log(`🎉 [UPLOAD_ROUTE] Upload complete for user ${user.email}`)
-    return Response.json({
+    console.log(`🎉 [UPLOAD_ROUTE] Upload complete for user ${userEmail}`)
+    return NextResponse.json({
       success: true,
       data: {
         url: fileUrl,
@@ -93,26 +127,30 @@ export const POST = requireAuth(async (req: NextRequest, context: any, user?: an
         size: file.size,
         mimetype: file.type,
         uploadedBy: {
-          id: user.id,
-          email: user.email,
-          role: user.role
+          id: userId,
+          email: userEmail,
+          role: userRole
         }
       }
     })
 
   } catch (error) {
     console.error('💥 [UPLOAD_ROUTE] Unexpected error during upload:', error)
-    return Response.json(
-      { success: false, error: 'Upload failed', details: error instanceof Error ? error.message : String(error) },
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Upload failed', 
+        details: error instanceof Error ? error.message : String(error) 
+      },
       { status: 500 }
     )
   }
-})
+}
 
 // OPTIONS for CORS preflight
-export const OPTIONS = async () => {
+export async function OPTIONS() {
   console.log('⚙️ [UPLOAD_ROUTE] Handling OPTIONS (CORS preflight)')
-  return new Response(null, {
+  return new NextResponse(null, {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',

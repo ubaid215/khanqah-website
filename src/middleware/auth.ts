@@ -1,3 +1,4 @@
+// src/middleware/auth.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { AuthMiddleware } from '@/controllers/AuthController'
 
@@ -33,9 +34,19 @@ export async function authMiddleware(req: NextRequest) {
   })
 }
 
+// Type definition for route handlers with context
+type RouteContext<T = any> = {
+  params: T
+}
+
+type RouteHandler<T = any> = (
+  req: NextRequest,
+  context: RouteContext<T>
+) => Promise<NextResponse | Response>
+
 // Fixed requireAuth function for Next.js App Router
-export function requireAuth(handler: Function) {
-  return async (req: NextRequest) => {
+export function requireAuth<T = any>(handler: RouteHandler<T>): RouteHandler<T> {
+  return async (req: NextRequest, context: RouteContext<T>) => {
     const authResult = await AuthMiddleware.verifyAuth(req)
     if (authResult.error) {
       return NextResponse.json(
@@ -44,15 +55,15 @@ export function requireAuth(handler: Function) {
       )
     }
     
-    // Call the handler with the request
-    return handler(req)
+    // Call the handler with both request AND context
+    return handler(req, context)
   }
 }
 
 // Fixed requireRole function for Next.js App Router
 export function requireRole(roles: string[]) {
-  return (handler: Function) => {
-    return async (req: NextRequest) => {
+  return <T = any>(handler: RouteHandler<T>): RouteHandler<T> => {
+    return async (req: NextRequest, context: RouteContext<T>) => {
       const authResult = await AuthMiddleware.requireRole(roles)(req)
       if (authResult.error) {
         return NextResponse.json(
@@ -60,7 +71,8 @@ export function requireRole(roles: string[]) {
           { status: 403 }
         )
       }
-      return handler(req)
+      // Call the handler with both request AND context
+      return handler(req, context)
     }
   }
 }

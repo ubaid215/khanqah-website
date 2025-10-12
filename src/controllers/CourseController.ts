@@ -1,4 +1,3 @@
-// src/controllers/CourseController.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { CourseModel } from '@/models/Course'
 import { AuthMiddleware, ApiResponse } from './AuthController'
@@ -67,36 +66,62 @@ export class CourseController {
     }
   }
 
-static async getCourse(req: NextRequest, { params }: { params: { id?: string; slug?: string } }) {
+  static async getCourse(req: NextRequest, { params }: { params: { id?: string; slug?: string } }) {
+  console.log("📘 [CourseController] getCourse() called with params:", params);
+
   try {
     let course;
-    
+
+    // 🔹 Check what identifier is provided
     if (params.id) {
+      console.log("🔍 Fetching course by ID:", params.id);
       course = await CourseModel.findById(params.id);
     } else if (params.slug) {
+      console.log("🔍 Fetching course by Slug:", params.slug);
       course = await CourseModel.findBySlug(params.slug);
     } else {
-      return ApiResponse.error('Course ID or slug is required', 400);
+      console.warn("⚠️ No course ID or slug provided in params");
+      return ApiResponse.error("Course ID or slug is required", 400);
     }
-    
+
+    // 🔹 Check if course was found
     if (!course) {
-      return ApiResponse.error('Course not found', 404);
+      console.warn("❌ Course not found for given params:", params);
+      return ApiResponse.error("Course not found", 404);
     }
 
+    // 🔹 Verify authentication
+    console.log("🔑 Verifying authentication...");
     const authResult = await AuthMiddleware.verifyAuth(req);
-    const isAdmin = authResult.user && 
-      [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
+    console.log("👤 Auth result:", authResult?.user ? `User: ${authResult.user.email}` : "No user");
 
+    // 🔹 Check admin privileges
+    const isAdmin =
+      authResult.user &&
+      [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
+    console.log("🛡️ Is Admin:", isAdmin);
+
+    // 🔹 Restrict unpublished courses for non-admin users
     if (!course.isPublished && !isAdmin) {
-      return ApiResponse.error('Course not found', 404);
+      console.warn("🚫 Unpublished course accessed by non-admin user");
+      return ApiResponse.error("Course not found", 404);
     }
 
-    return ApiResponse.success(course, 'Course retrieved successfully');
-  } catch (error) {
-    console.error('Get course error:', error);
-    return ApiResponse.error('Internal server error');
+    console.log("✅ Course retrieved successfully:", {
+      id: course.id,
+      title: course.title,
+      slug: course.slug,
+      isPublished: course.isPublished,
+    });
+
+    return ApiResponse.success(course, "Course retrieved successfully");
+  } catch (error: any) {
+    console.error("🔥 [getCourse] Internal server error:", error.message || error);
+    return ApiResponse.error("Internal server error");
   }
 }
+
+
 
   static async updateCourse(req: NextRequest, { params }: { params: { id: string } }) {
     try {
@@ -134,8 +159,8 @@ static async getCourse(req: NextRequest, { params }: { params: { id?: string; sl
   static async getPublishedCourses(req: NextRequest) {
     try {
       const { searchParams } = new URL(req.url)
-      const categorySlug = searchParams.get('category')
-      const level = searchParams.get('level') as CourseLevel | null
+      const categorySlug = searchParams.get('category') || undefined
+      const level = (searchParams.get('level') as CourseLevel) || undefined
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '10')
 
@@ -153,35 +178,34 @@ static async getCourse(req: NextRequest, { params }: { params: { id?: string; sl
     }
   }
 
- 
- static async getAllCourses(req: NextRequest) {
-  try {
-    // Verify admin authentication
-    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 403)
+  static async getAllCourses(req: NextRequest) {
+    try {
+      // Verify admin authentication
+      const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 403)
+      }
+
+      const { searchParams } = new URL(req.url)
+      const status = (searchParams.get('status') as CourseStatus) || undefined
+      const level = (searchParams.get('level') as CourseLevel) || undefined
+      const page = parseInt(searchParams.get('page') || '1')
+      const limit = parseInt(searchParams.get('limit') || '100')
+
+      // Get all courses with filters (including drafts and archived)
+      const result = await CourseModel.getAllCourses({
+        status,
+        level,
+        page,
+        limit
+      })
+
+      return ApiResponse.success(result, 'Courses retrieved successfully')
+    } catch (error) {
+      console.error('Get all courses error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as CourseStatus | null
-    const level = searchParams.get('level') as CourseLevel | null
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '100')
-
-    // Get all courses with filters (including drafts and archived)
-    const result = await CourseModel.getAllCourses({
-      status,
-      level,
-      page,
-      limit
-    })
-
-    return ApiResponse.success(result, 'Courses retrieved successfully')
-  } catch (error) {
-    console.error('Get all courses error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
   static async enrollInCourse(req: NextRequest, { params }: { params: { id: string } }) {
     try {
@@ -246,21 +270,88 @@ static async getCourse(req: NextRequest, { params }: { params: { id?: string; sl
     }
   }
 
-  static async getUserEnrollments(req: NextRequest) {
-    try {
-      const authResult = await AuthMiddleware.verifyAuth(req)
-      if (authResult.error) {
-        return ApiResponse.error(authResult.error, 401)
-      }
+ static async getLessonProgress(req: NextRequest, { params }: { params: { lessonId: string } }) {
+  console.log("📘 [LessonController] getLessonProgress() called with params:", params);
 
-      // This would require adding a method to CourseModel to get user enrollments
-      // For now, returning success with empty data
-      return ApiResponse.success([], 'Enrollments retrieved successfully')
-    } catch (error) {
-      console.error('Get user enrollments error:', error)
-      return ApiResponse.error('Internal server error')
+  try {
+    // Step 1: Verify authentication
+    const authResult = await AuthMiddleware.verifyAuth(req);
+    console.log("👤 Auth verification result:", {
+      isAuthenticated: !authResult.error,
+      userId: authResult.user?.id,
+      userRole: authResult.user?.role,
+    });
+
+    if (authResult.error) {
+      console.warn("⚠️ Unauthorized access attempt for lesson progress:", {
+        lessonId: params.lessonId,
+      });
+      return ApiResponse.error(authResult.error, 401);
     }
+
+    // Step 2: Fetch lesson progress
+    console.log("🔍 Fetching progress for:", {
+      lessonId: params.lessonId,
+      userId: authResult.user!.id,
+    });
+
+    const progress = await CourseModel.getLessonProgress(params.lessonId, authResult.user!.id);
+
+    // Step 3: Check if progress exists
+    if (!progress) {
+      console.warn("❌ Lesson progress not found for:", {
+        lessonId: params.lessonId,
+        userId: authResult.user!.id,
+      });
+      return ApiResponse.error("Progress not found", 404);
+    }
+
+    console.log("✅ Lesson progress retrieved successfully:", progress);
+
+    return ApiResponse.success(progress, "Lesson progress retrieved successfully");
+  } catch (error) {
+    console.error("💥 [LessonController] Get lesson progress error:", error);
+    return ApiResponse.error("Internal server error");
   }
+}
+
+
+  static async getUserEnrollments(req: NextRequest) {
+  try {
+    const authResult = await AuthMiddleware.verifyAuth(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 401)
+    }
+
+    // Use the CourseModel method to get actual enrollments
+    const enrollments = await CourseModel.getUserEnrollments(authResult.user!.id)
+
+    return ApiResponse.success(enrollments, 'Enrollments retrieved successfully')
+  } catch (error) {
+    console.error('Get user enrollments error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
+
+static async getUserEnrollment(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const authResult = await AuthMiddleware.verifyAuth(req)
+    if (authResult.error) {
+      return ApiResponse.error(authResult.error, 401)
+    }
+
+    const enrollment = await CourseModel.getUserEnrollment(params.id, authResult.user!.id)
+    
+    if (!enrollment) {
+      return ApiResponse.error('Enrollment not found', 404)
+    }
+
+    return ApiResponse.success(enrollment, 'Enrollment retrieved successfully')
+  } catch (error) {
+    console.error('Get user enrollment error:', error)
+    return ApiResponse.error('Internal server error')
+  }
+}
 
   // Module and Lesson management
   static async createModule(req: NextRequest) {
@@ -323,68 +414,68 @@ static async getCourse(req: NextRequest, { params }: { params: { id?: string; sl
   }
 
   // Module methods
-static async updateModule(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 403)
+  static async updateModule(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+      const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 403)
+      }
+
+      const data = await req.json()
+      const module = await CourseModel.updateModule(params.id, data)
+
+      return ApiResponse.success(module, 'Module updated successfully')
+    } catch (error) {
+      console.error('Update module error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    const data = await req.json()
-    const module = await CourseModel.updateModule(params.id, data)
-
-    return ApiResponse.success(module, 'Module updated successfully')
-  } catch (error) {
-    console.error('Update module error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
-static async deleteModule(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 403)
+  static async deleteModule(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+      const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 403)
+      }
+
+      await CourseModel.deleteModule(params.id)
+      return ApiResponse.success(null, 'Module deleted successfully')
+    } catch (error) {
+      console.error('Delete module error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    await CourseModel.deleteModule(params.id)
-    return ApiResponse.success(null, 'Module deleted successfully')
-  } catch (error) {
-    console.error('Delete module error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
-// Lesson methods
-static async updateLesson(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 403)
+  // Lesson methods
+  static async updateLesson(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+      const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 403)
+      }
+
+      const data = await req.json()
+      const lesson = await CourseModel.updateLesson(params.id, data)
+
+      return ApiResponse.success(lesson, 'Lesson updated successfully')
+    } catch (error) {
+      console.error('Update lesson error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    const data = await req.json()
-    const lesson = await CourseModel.updateLesson(params.id, data)
-
-    return ApiResponse.success(lesson, 'Lesson updated successfully')
-  } catch (error) {
-    console.error('Update lesson error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
-static async deleteLesson(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 403)
+  static async deleteLesson(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+      const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 403)
+      }
+
+      await CourseModel.deleteLesson(params.id)
+      return ApiResponse.success(null, 'Lesson deleted successfully')
+    } catch (error) {
+      console.error('Delete lesson error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    await CourseModel.deleteLesson(params.id)
-    return ApiResponse.success(null, 'Lesson deleted successfully')
-  } catch (error) {
-    console.error('Delete lesson error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 }
