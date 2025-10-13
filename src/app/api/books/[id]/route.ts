@@ -1,16 +1,47 @@
 // src/app/api/books/[id]/route.ts
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { BookController } from '@/controllers/BookController'
-import { requireAdmin } from '@/middleware/auth'
+import { requireAuth, requireAdmin } from '@/middleware/auth'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  return await BookController.getBook(req, { params })
+// GET /api/books/[id] - Get specific book
+async function getBookHandler(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    return await BookController.getBook(req, { params: { slug: params.id } })
+  } catch (error) {
+    console.error('Get book error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
 }
 
-export const PUT = requireAdmin(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  return await BookController.updateBook(req, { params })
-})
+// PUT /api/books/[id] - Update book
+async function updateBookHandler(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    return await BookController.updateBook(req, { params })
+  } catch (error) {
+    console.error('Update book error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
 
-export const DELETE = requireAdmin(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  return await BookController.deleteBook(req, { params })
-})
+// DELETE /api/books/[id] - Delete book
+async function deleteBookHandler(req: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    return await BookController.deleteBook(req, { params })
+  } catch (error) {
+    console.error('Delete book error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export const GET = requireAuth(requireAdmin(getBookHandler))
+export const PUT = requireAuth(requireAdmin(updateBookHandler))
+export const DELETE = requireAuth(requireAdmin(deleteBookHandler))

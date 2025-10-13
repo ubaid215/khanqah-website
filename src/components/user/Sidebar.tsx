@@ -30,11 +30,11 @@ const menuItems = [
     href: '/dashboard/courses',
     icon: BookOpen,
   },
-  {
-    name: 'Questions',
-    href: '/dashboard/questions',
-    icon: HelpCircle,
-  },
+  // {
+  //   name: 'Questions',
+  //   href: '/dashboard/questions',
+  //   icon: HelpCircle,
+  // },
   // {
   //   name: 'Certificates',
   //   href: '/dashboard/certificates',

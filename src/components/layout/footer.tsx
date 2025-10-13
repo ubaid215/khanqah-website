@@ -26,7 +26,6 @@ const Footer = () => {
       links: [
         { name: 'About Us', href: '/about' },
         { name: 'Our Team', href: '/team' },
-        { name: 'Careers', href: '/careers' },
         { name: 'Contact', href: '/contact' },
       ],
     },
@@ -60,9 +59,9 @@ const Footer = () => {
   };
 
   const contactInfo = [
-    { icon: Mail, text: 'contact@yourbrand.com' },
-    { icon: Phone, text: '+1 (555) 123-4567' },
-    { icon: MapPin, text: '123 Main St, City, Country' },
+    { icon: Mail, text: 'khanqahsaifia@gmail.com' },
+    { icon: Phone, text: '+92301-0000000' },
+    { icon: MapPin, text: 'Astana Aliya Murshidabad Shareef, Jhand Road Faisalabd, Pakistan' },
   ];
 
   return (

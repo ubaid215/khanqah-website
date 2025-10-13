@@ -9,34 +9,41 @@ const HeroSlider = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const slides = [
-    {
-      id: 1,
-      title: "Khangah Saifia",
-      subtitle: "Industry Professionals",
-      description: "Expert-Led Courses from the best instructors in the field",
-      image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&h=600&fit=crop",
-      buttonText: "View Courses",
-      buttonLink: "/courses"
-    },
-    {
-      id: 2,
-      title: "Learn Anytime, Anywhere",
-      subtitle: "Flexible Learning",
-      description: "Access courses on any device at your own pace",
-      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&h=600&fit=crop",
-      buttonText: "Start Learning",
-      buttonLink: "/signup"
-    },
-    {
-      id: 3,
-      title: "Join Our Community",
-      subtitle: "Connect & Grow",
-      description: "Learn with thousands of students worldwide",
-      image: "https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=1200&h=600&fit=crop",
-      buttonText: "Join Now",
-      buttonLink: "/community"
-    }
-  ];
+  {
+    id: 1,
+    title: "Khanqah Saifia",
+    subtitle: "Path of Spiritual Enlightenment",
+    description:
+      "Discover the teachings of Tasawwuf and purify your heart through the guidance of Awliya Allah. Learn how to live with peace, purpose, and closeness to Allah.",
+    image:
+      "https://images.unsplash.com/photo-1526677504211-233c8477c61b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070",
+    buttonText: "Explore Teachings",
+    buttonLink: "/courses",
+  },
+  {
+    id: 2,
+    title: "Islamic Knowledge for Every Heart",
+    subtitle: "Authentic Education & Guidance",
+    description:
+      "Gain true Islamic understanding through authentic sources — Qur'an, Hadith, and the wisdom of scholars. Build your foundation of Deen with love and knowledge.",
+    image:
+      "https://images.unsplash.com/photo-1587617425953-9075d28b8c46?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
+    buttonText: "Start Learning",
+    buttonLink: "/courses",
+  },
+  {
+    id: 3,
+    title: "Spiritual Connection & Community",
+    subtitle: "Journey Towards Allah",
+    description:
+      "Join a community dedicated to remembrance, reflection, and righteous action. Walk the path of sincerity and spiritual awakening with fellow seekers of truth.",
+    image:
+      "https://images.unsplash.com/photo-1575751639353-e292e76daca3?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
+    buttonText: "Join the Community",
+    buttonLink: "/community",
+  },
+];
+
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % slides.length);

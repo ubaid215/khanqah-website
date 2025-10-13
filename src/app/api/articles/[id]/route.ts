@@ -1,16 +1,49 @@
 // src/app/api/articles/[id]/route.ts
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { ArticleController } from '@/controllers/ArticleController'
-import { requireAdmin } from '@/middleware/auth'
+import { requireAuth, requireAdmin } from '@/middleware/auth'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  return await ArticleController.getArticle(req, { params })
-}
+// GET /api/articles/[id] - Get specific article
+export const GET = requireAuth(requireAdmin(
+  async (req: NextRequest, { params }: { params: { id: string } }) => {
+    try {
+      return await ArticleController.getArticle(req, { params })
+    } catch (error) {
+      console.error('Get article error:', error)
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+  }
+))
 
-export const PUT = requireAdmin(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  return await ArticleController.updateArticle(req, { params })
-})
+// PUT /api/articles/[id] - Update article
+export const PUT = requireAuth(requireAdmin(
+  async (req: NextRequest, { params }: { params: { id: string } }) => {
+    try {
+      return await ArticleController.updateArticle(req, { params })
+    } catch (error) {
+      console.error('Update article error:', error)
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+  }
+))
 
-export const DELETE = requireAdmin(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  return await ArticleController.deleteArticle(req, { params })
-})
+// DELETE /api/articles/[id] - Delete article
+export const DELETE = requireAuth(requireAdmin(
+  async (req: NextRequest, { params }: { params: { id: string } }) => {
+    try {
+      return await ArticleController.deleteArticle(req, { params })
+    } catch (error) {
+      console.error('Delete article error:', error)
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+  }
+))

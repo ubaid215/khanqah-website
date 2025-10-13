@@ -10,6 +10,9 @@ export interface ApiResponse<T = any> {
 }
 
 export interface PaginatedResponse<T = any> extends ApiResponse<T> {
+  courses: boolean
+  articles: boolean
+  books: boolean
   pagination?: {
     page: number
     limit: number
@@ -269,6 +272,8 @@ export interface ArticleFilters {
 }
 
 export interface ArticleWithRelations {
+  success: ArticleWithRelations
+  error: string
   id: string
   title: string
   slug: string

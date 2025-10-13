@@ -1,26 +1,34 @@
 // src/app/api/articles/route.ts
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { ArticleController } from '@/controllers/ArticleController'
-import { requireAdmin } from '@/middleware/auth'
+import { requireAuth, requireAdmin } from '@/middleware/auth'
 
-export const GET = async (req: NextRequest) => {
-  // Public access to published articles
-  const { searchParams } = new URL(req.url)
-  if (searchParams.get('published') === 'true') {
-    return await ArticleController.getPublishedArticles(req)
+// GET /api/articles - Get all articles (admin only)
+export const GET = requireAuth(requireAdmin(
+  async (req: NextRequest) => {
+    try {
+      return await ArticleController.getPublishedArticles(req)
+    } catch (error) {
+      console.error('Get articles error:', error)
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
   }
-  
-  // Admin access to all articles
-  return requireAdmin(ArticleController.getAllArticles)(req)
-}
+))
 
-export const POST = requireAdmin(async (req: NextRequest) => {
-  return await ArticleController.createArticle(req)
-})
-
-// Helper function for admin-only article listing
-async function getAllArticles(req: NextRequest) {
-  // This would call a method to get all articles (including drafts)
-  // For now, redirecting to published articles
-  return await ArticleController.getPublishedArticles(req)
-}
+// POST /api/articles - Create new article (admin only)
+export const POST = requireAuth(requireAdmin(
+  async (req: NextRequest) => {
+    try {
+      return await ArticleController.createArticle(req)
+    } catch (error) {
+      console.error('Create article error:', error)
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+  }
+))

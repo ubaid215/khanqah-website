@@ -524,15 +524,67 @@ export class ApiClient {
     return response.data!
   }
 
-  async getArticleBySlug(slug: string): Promise<ArticleWithRelations> {
+async getArticleBySlug(slug: string): Promise<ArticleWithRelations> {
+  try {
     const response = await this.get<ArticleWithRelations>(`/articles/slug/${slug}`)
     return response.data!
+  } catch (error: any) {
+    // Re-throw the error with proper context
+    throw error
   }
+}
 
-  async createArticle(articleData: CreateArticleData): Promise<ArticleWithRelations> {
-    const response = await this.post<ArticleWithRelations>('/articles', articleData)
+// Add a dedicated method for checking slug availability
+async checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
+  try {
+    const response = await this.get<{ available: boolean }>(`/articles/check-slug/${slug}`)
     return response.data!
+  } catch (error: any) {
+    console.error('Error checking slug availability:', error)
+    // On error, assume slug is not available to be safe
+    return { available: false }
   }
+}
+
+  // In your api.ts file, update the createArticle method:
+async createArticle(articleData: CreateArticleData): Promise<any> {
+  try {
+    const response = await this.post<ArticleWithRelations>('/articles', articleData)
+    
+    // FIXED: Better response handling
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Article created successfully'
+      }
+    } else {
+      // If the API returns an error response
+      return {
+        success: false,
+        error: response.error || 'Failed to create article',
+        data: null
+      }
+    }
+  } catch (error: any) {
+    console.error('API Client - Create article error:', error)
+    
+    // Handle different error types
+    if (error instanceof ApiError) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+        status: error.status
+      }
+    }
+    
+    return {
+      success: false,
+      error: 'Network error or server unavailable'
+    }
+  }
+}
 
   async updateArticle(id: string, articleData: UpdateArticleData): Promise<ArticleWithRelations> {
     const response = await this.put<ArticleWithRelations>(`/articles/${id}`, articleData)

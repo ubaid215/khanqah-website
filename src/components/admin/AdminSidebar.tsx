@@ -41,16 +41,16 @@ const menuItems = [
     href: '/admin/books',
     icon: Book,
   },
-  {
-    name: 'Questions',
-    href: '/admin/questions',
-    icon: HelpCircle,
-  },
-  {
-    name: 'Users',
-    href: '/admin/users',
-    icon: Users,
-  },
+  // {
+  //   name: 'Questions',
+  //   href: '/admin/questions',
+  //   icon: HelpCircle,
+  // },
+  // {
+  //   name: 'Users',
+  //   href: '/admin/users',
+  //   icon: Users,
+  // },
   {
     name: 'Profile',
     href: '/admin/profile',

@@ -71,9 +71,9 @@ const Navbar: React.FC = () => {
       name: 'Courses',
       href: '/courses',
       submenu: [
-        { name: 'Web Development', href: '/courses/web-dev' },
-        { name: 'Mobile Development', href: '/courses/mobile-dev' },
-        { name: 'Data Science', href: '/courses/data-science' },
+        { name: 'Web Development', href: '/courses' },
+        { name: 'Mobile Development', href: '/courses' },
+        { name: 'Data Science', href: '/courses' },
       ],
     },
     { name: 'Books', href: '/books' },
@@ -117,7 +117,7 @@ const Navbar: React.FC = () => {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
-        className={`bg-white/95 backdrop-blur-sm border-b border-gray-100 transition-shadow duration-300 ${
+        className={`bg-white/75 backdrop-blur-sm border-b border-gray-100 transition-shadow duration-300 ${
           scrolled ? 'shadow-md' : ''
         }`}
       >
@@ -164,7 +164,7 @@ const Navbar: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2, duration: 0.5 }}
-        className="hidden lg:block bg-gray-50/95 backdrop-blur-sm border-b border-gray-100"
+        className="hidden lg:block bg-[#e5eff6]/75 backdrop-blur-sm border-b border-gray-100"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-12">

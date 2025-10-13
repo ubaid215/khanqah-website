@@ -1,7 +1,7 @@
 // src/app/admin/books/create/page.tsx
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 import { uploadImage, validateImage } from '@/lib/upload'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { Toast } from '@/components/ui/toast'
 import { 
   ArrowLeft,
   Save,
@@ -17,9 +18,30 @@ import {
   FileText,
   Loader2,
   Eye,
-  X
+  X,
+  Check,
+  AlertCircle
 } from 'lucide-react'
 import { BookStatus } from '@/types'
+
+// Define the form data type
+interface BookFormData {
+  title: string
+  slug: string
+  description: string
+  author: string
+  pages: number
+  status: BookStatus
+}
+
+const initialFormData: BookFormData = {
+  title: '',
+  slug: '',
+  description: '',
+  author: '',
+  pages: 0,
+  status: BookStatus.DRAFT
+}
 
 export default function CreateBookPage() {
   const router = useRouter()
@@ -33,37 +55,149 @@ export default function CreateBookPage() {
   const [fileUrl, setFileUrl] = useState('')
   const [coverError, setCoverError] = useState('')
   const [fileError, setFileError] = useState('')
+  const [formData, setFormData] = useState<BookFormData>(initialFormData)
+  const [toast, setToast] = useState<{
+    open: boolean
+    title: string
+    description?: string
+    variant: 'default' | 'destructive' | 'success'
+  } | null>(null)
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
+  const [checkingSlug, setCheckingSlug] = useState(false)
 
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    author: '',
-    pages: 0,
-    status: BookStatus.DRAFT
-  })
+  const showToast = (title: string, description?: string, variant: 'default' | 'destructive' | 'success' = 'default') => {
+    setToast({ open: true, title, description, variant })
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData(initialFormData)
+    setCoverImage('')
+    setFileUrl('')
+    setCoverError('')
+    setFileError('')
+    setSlugAvailable(null)
+    if (coverInputRef.current) coverInputRef.current.value = ''
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // Check if slug is available
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug || slug.length < 3) {
+      setSlugAvailable(null)
+      return
+    }
+
+    setCheckingSlug(true)
+    try {
+      // Try to get book by slug - if it exists, slug is taken
+      await apiClient.getBookBySlug(slug)
+      setSlugAvailable(false)
+    } catch (error: any) {
+      // If we get a 404, the slug is available
+      if (error.status === 404) {
+        setSlugAvailable(true)
+      } else {
+        setSlugAvailable(null)
+      }
+    } finally {
+      setCheckingSlug(false)
+    }
+  }
+
+  // Debounced slug check
+  useEffect(() => {
+    if (formData.slug) {
+      const timer = setTimeout(() => {
+        checkSlugAvailability(formData.slug)
+      }, 500)
+
+      return () => clearTimeout(timer)
+    }
+  }, [formData.slug])
+
+  const handleSubmit = async (e: React.FormEvent, publish: boolean = false) => {
     e.preventDefault()
+    
+    // Validate form
+    if (!formData.title || !formData.description || !formData.author || !formData.slug) {
+      showToast('Validation Error', 'Please fill in all required fields.', 'destructive')
+      return
+    }
+
+    // Check slug availability before submitting
+    if (slugAvailable === false) {
+      showToast('Slug Taken', 'This slug is already in use. Please choose a different one.', 'destructive')
+      return
+    }
+
     setIsLoading(true)
 
     try {
       const bookData = {
         ...formData,
         coverImage: coverImage || undefined,
-        fileUrl: fileUrl || undefined
+        fileUrl: fileUrl || undefined,
+        status: publish ? BookStatus.PUBLISHED : formData.status
       }
       
+      console.log('📚 Submitting book:', bookData)
+      
       const response = await apiClient.createBook(bookData)
-      if (response.success) {
-        router.push('/admin/books')
+      
+      if (response && response.success) {
+        const message = publish ? 'Book published successfully!' : 'Book saved as draft!'
+        showToast('Success', message, 'success')
+        
+        // Reset form
+        resetForm()
+        
+        // Redirect after a short delay to show the toast
+        setTimeout(() => {
+          router.push('/admin/books')
+        }, 1500)
+      } else {
+        const errorMessage = (response as any)?.error || 'Failed to create book'
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
-      console.error('Failed to create book:', error)
-      alert(error.message || 'Failed to create book')
+      console.error('❌ Failed to create book:', error)
+      
+      // Handle specific error cases
+      let errorMessage = 'Failed to create book. Please try again.'
+      
+      if (error.message?.includes('slug already exists')) {
+        errorMessage = 'This slug is already taken. Please choose a different one.'
+        setSlugAvailable(false)
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      showToast('Error', errorMessage, 'destructive')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSaveBook = (e: React.FormEvent) => {
+    handleSubmit(e, false)
+  }
+
+  const handlePublish = (e: React.FormEvent) => {
+    if (!formData.title || !formData.description || !formData.author || !formData.slug) {
+      showToast('Validation Error', 'Please fill in all required fields before publishing.', 'destructive')
+      return
+    }
+
+    if (slugAvailable === false) {
+      showToast('Slug Taken', 'This slug is already in use. Please choose a different one.', 'destructive')
+      return
+    }
+    
+    if (!confirm('Are you sure you want to publish this book? It will be visible to all users.')) {
+      return
+    }
+    
+    handleSubmit(e, true)
   }
 
   const generateSlug = (title: string) => {
@@ -76,11 +210,21 @@ export default function CreateBookPage() {
   }
 
   const handleTitleChange = (title: string) => {
+    const newSlug = generateSlug(title)
     setFormData(prev => ({
       ...prev,
       title,
-      slug: generateSlug(title)
+      slug: newSlug
     }))
+  }
+
+  const handleSlugChange = (slug: string) => {
+    const cleanedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
+    setFormData(prev => ({
+      ...prev,
+      slug: cleanedSlug
+    }))
+    setSlugAvailable(null) // Reset availability check when slug changes
   }
 
   const handleCoverUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +234,7 @@ export default function CreateBookPage() {
     const validationError = validateImage(file)
     if (validationError) {
       setCoverError(validationError)
+      showToast('Upload Error', validationError, 'destructive')
       return
     }
 
@@ -99,9 +244,12 @@ export default function CreateBookPage() {
     try {
       const result = await uploadImage(file)
       setCoverImage(result.url)
+      showToast('Success', 'Cover image uploaded successfully!', 'success')
     } catch (error) {
       console.error('Cover upload failed:', error)
-      setCoverError('Failed to upload cover image. Please try again.')
+      const errorMessage = 'Failed to upload cover image. Please try again.'
+      setCoverError(errorMessage)
+      showToast('Upload Error', errorMessage, 'destructive')
     } finally {
       setIsCoverUploading(false)
       if (coverInputRef.current) {
@@ -117,14 +265,18 @@ export default function CreateBookPage() {
     // Validate file type for books (PDF, EPUB, etc.)
     const validTypes = ['application/pdf', 'application/epub+zip']
     if (!validTypes.includes(file.type)) {
-      setFileError('Please select a valid book file (PDF or EPUB)')
+      const errorMessage = 'Please select a valid book file (PDF or EPUB)'
+      setFileError(errorMessage)
+      showToast('Upload Error', errorMessage, 'destructive')
       return
     }
 
     // Check file size (50MB max for books)
     const maxSize = 50 * 1024 * 1024
     if (file.size > maxSize) {
-      setFileError('Book file must be less than 50MB')
+      const errorMessage = 'Book file must be less than 50MB'
+      setFileError(errorMessage)
+      showToast('Upload Error', errorMessage, 'destructive')
       return
     }
 
@@ -135,11 +287,16 @@ export default function CreateBookPage() {
       // In a real app, you'd upload to your file storage
       // For now, we'll simulate the upload
       await new Promise(resolve => setTimeout(resolve, 2000))
-      const mockUrl = URL.createObjectURL(file)
+      
+      // Simulate file upload response
+      const mockUrl = `/uploads/books/${Date.now()}-${file.name}`
       setFileUrl(mockUrl)
+      showToast('Success', 'Book file uploaded successfully!', 'success')
     } catch (error) {
       console.error('File upload failed:', error)
-      setFileError('Failed to upload book file. Please try again.')
+      const errorMessage = 'Failed to upload book file. Please try again.'
+      setFileError(errorMessage)
+      showToast('Upload Error', errorMessage, 'destructive')
     } finally {
       setIsFileUploading(false)
       if (fileInputRef.current) {
@@ -158,38 +315,28 @@ export default function CreateBookPage() {
     setFileError('')
   }
 
-  const handlePublish = async () => {
-    if (!confirm('Are you sure you want to publish this book?')) return
-    
-    try {
-      const bookData = {
-        ...formData,
-        coverImage: coverImage || undefined,
-        fileUrl: fileUrl || undefined,
-        status: BookStatus.PUBLISHED
-      }
-      
-      const response = await apiClient.createBook(bookData)
-      if (response.success) {
-        router.push('/admin/books')
-      }
-    } catch (error: any) {
-      console.error('Failed to publish book:', error)
-      alert(error.message || 'Failed to publish book')
-    }
-  }
-
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          open={toast.open}
+          onOpenChange={(open) => setToast(open ? toast : null)}
+          title={toast.title}
+          description={toast.description}
+          variant={toast.variant}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button
             variant="outline"
-            onClick={() => router.back()}
+            onClick={() => router.push('/admin/books')}
             className="border-gray-300"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Books
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Upload New Book</h1>
@@ -198,19 +345,9 @@ export default function CreateBookPage() {
             </p>
           </div>
         </div>
-        
-        <div className="flex space-x-2">
-          <Button
-            onClick={handlePublish}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            Publish
-          </Button>
-        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSaveBook}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -231,6 +368,7 @@ export default function CreateBookPage() {
                     onChange={(e) => handleTitleChange(e.target.value)}
                     placeholder="Enter book title"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -238,15 +376,36 @@ export default function CreateBookPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Slug *
                   </label>
-                  <Input
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    placeholder="book-slug"
-                    required
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    This will be used in the URL
-                  </p>
+                  <div className="relative">
+                    <Input
+                      value={formData.slug}
+                      onChange={(e) => handleSlugChange(e.target.value)}
+                      placeholder="book-slug"
+                      required
+                      disabled={isLoading}
+                      className={slugAvailable === false ? 'border-red-300' : slugAvailable === true ? 'border-green-300' : ''}
+                    />
+                    {checkingSlug && (
+                      <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                    )}
+                    {slugAvailable === true && (
+                      <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-500" />
+                    )}
+                    {slugAvailable === false && (
+                      <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-red-500" />
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <p className="text-sm text-gray-500">
+                      This will be used in the URL
+                    </p>
+                    {slugAvailable === true && (
+                      <span className="text-xs text-green-600 font-medium">✓ Available</span>
+                    )}
+                    {slugAvailable === false && (
+                      <span className="text-xs text-red-600 font-medium">✗ Already taken</span>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -258,6 +417,7 @@ export default function CreateBookPage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, author: e.target.value }))}
                     placeholder="Book author name"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -271,7 +431,11 @@ export default function CreateBookPage() {
                     placeholder="Book description and summary"
                     rows={6}
                     required
+                    disabled={isLoading}
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    {formData.description.length} characters
+                  </p>
                 </div>
 
                 <div>
@@ -281,9 +445,10 @@ export default function CreateBookPage() {
                   <Input
                     type="number"
                     value={formData.pages}
-                    onChange={(e) => setFormData(prev => ({ ...prev, pages: parseInt(e.target.value) }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, pages: parseInt(e.target.value) || 0 }))}
                     placeholder="0"
                     min="0"
+                    disabled={isLoading}
                   />
                 </div>
               </CardContent>
@@ -308,6 +473,7 @@ export default function CreateBookPage() {
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as BookStatus }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    disabled={isLoading}
                   >
                     <option value={BookStatus.DRAFT}>Draft</option>
                     <option value={BookStatus.PUBLISHED}>Published</option>
@@ -331,12 +497,15 @@ export default function CreateBookPage() {
                   onChange={handleCoverUpload}
                   accept="image/*"
                   className="hidden"
+                  disabled={isLoading || isCoverUploading}
                 />
 
                 {!coverImage ? (
                   <div 
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-purple-500 transition-colors"
-                    onClick={() => coverInputRef.current?.click()}
+                    className={`border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      !isLoading && !isCoverUploading ? 'hover:border-purple-500' : 'opacity-50'
+                    }`}
+                    onClick={() => !isLoading && !isCoverUploading && coverInputRef.current?.click()}
                   >
                     {isCoverUploading ? (
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
@@ -350,7 +519,7 @@ export default function CreateBookPage() {
                       type="button"
                       variant="outline"
                       className="border-gray-300"
-                      disabled={isCoverUploading}
+                      disabled={isLoading || isCoverUploading}
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       Choose Image
@@ -367,7 +536,8 @@ export default function CreateBookPage() {
                       <button
                         type="button"
                         onClick={handleRemoveCover}
-                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors disabled:opacity-50"
+                        disabled={isLoading}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -377,6 +547,7 @@ export default function CreateBookPage() {
                       variant="outline"
                       className="w-full border-gray-300"
                       onClick={() => coverInputRef.current?.click()}
+                      disabled={isLoading || isCoverUploading}
                     >
                       Change Image
                     </Button>
@@ -407,12 +578,15 @@ export default function CreateBookPage() {
                   onChange={handleFileUpload}
                   accept=".pdf,.epub"
                   className="hidden"
+                  disabled={isLoading || isFileUploading}
                 />
 
                 {!fileUrl ? (
                   <div 
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-purple-500 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      !isLoading && !isFileUploading ? 'hover:border-purple-500' : 'opacity-50'
+                    }`}
+                    onClick={() => !isLoading && !isFileUploading && fileInputRef.current?.click()}
                   >
                     {isFileUploading ? (
                       <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
@@ -426,7 +600,7 @@ export default function CreateBookPage() {
                       type="button"
                       variant="outline"
                       className="border-gray-300"
-                      disabled={isFileUploading}
+                      disabled={isLoading || isFileUploading}
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       Choose File
@@ -445,6 +619,7 @@ export default function CreateBookPage() {
                       variant="outline"
                       className="w-full border-gray-300"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isLoading || isFileUploading}
                     >
                       Change File
                     </Button>
@@ -467,7 +642,7 @@ export default function CreateBookPage() {
                 <div className="space-y-3">
                   <Button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !formData.title || !formData.description || !formData.author || !formData.slug || slugAvailable === false}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     {isLoading ? (
@@ -480,9 +655,24 @@ export default function CreateBookPage() {
                   
                   <Button
                     type="button"
+                    onClick={handlePublish}
+                    disabled={isLoading || !formData.title || !formData.description || !formData.author || !formData.slug || slugAvailable === false}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    Publish Book
+                  </Button>
+                  
+                  <Button
+                    type="button"
                     variant="outline"
                     className="w-full border-gray-300"
                     onClick={() => router.push('/admin/books')}
+                    disabled={isLoading}
                   >
                     Cancel
                   </Button>

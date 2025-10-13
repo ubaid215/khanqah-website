@@ -10,6 +10,26 @@ interface Category {
   id: string;
   name: string;
   slug: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Extended type to handle API response structure
+interface CourseWithExtras extends CourseWithRelations {
+  rating?: number;
+  featured?: boolean;
+  _count?: {
+    enrollments: number;
+    modules: number;
+    lessons: number;
+    reviews?: number;
+  };
+}
+
+interface ApiResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
 }
 
 const CoursesPage = () => {
@@ -17,7 +37,7 @@ const CoursesPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
   const [sortBy, setSortBy] = useState('popular');
-  const [courses, setCourses] = useState<CourseWithRelations[]>([]);
+  const [courses, setCourses] = useState<CourseWithExtras[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +54,9 @@ const CoursesPage = () => {
   // Debug function to log API responses
   const debugApiResponse = (response: any) => {
     console.log('API Response:', response);
-    console.log('Response success:', response.success);
-    console.log('Response data:', response.data);
-    if (response.data) {
+    console.log('Response success:', response?.success);
+    console.log('Response data:', response?.data);
+    if (response?.data) {
       console.log('Data structure:', {
         hasData: !!response.data.data,
         dataType: typeof response.data.data,
@@ -50,10 +70,10 @@ const CoursesPage = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await apiClient.getCategories();
+        const response = await apiClient.getCategories() as unknown as ApiResponse;
         console.log('Categories response:', response);
         
-        if (response.success && Array.isArray(response.data)) {
+        if (response?.success && response.data && Array.isArray(response.data)) {
           const categoryNames = response.data.map((cat: Category) => cat.name);
           setCategories(['All', ...categoryNames]);
         } else {
@@ -86,12 +106,12 @@ const CoursesPage = () => {
           filters.level = selectedLevel as CourseLevel;
         }
 
-        const response = await apiClient.getPublicCourses(filters);
+        const response = await apiClient.getPublicCourses(filters) as ApiResponse;
         debugApiResponse(response);
         
-        if (response.success) {
+        if (response?.success) {
           // Handle different possible response structures
-          let coursesData: CourseWithRelations[] = [];
+          let coursesData: CourseWithExtras[] = [];
           
           if (Array.isArray(response.data)) {
             // Direct array response
@@ -110,7 +130,7 @@ const CoursesPage = () => {
           // Extract unique categories from courses if we don't have them
           if (categories.length === 1 && coursesData.length > 0) {
             const uniqueCategories = new Set<string>();
-            coursesData.forEach((course: CourseWithRelations) => {
+            coursesData.forEach((course: CourseWithExtras) => {
               if (course.categories && course.categories.length > 0) {
                 course.categories.forEach((cat: any) => {
                   if (cat.category && cat.category.name) {
@@ -127,7 +147,7 @@ const CoursesPage = () => {
             }
           }
         } else {
-          throw new Error(response.error || 'Failed to fetch courses');
+          throw new Error(response?.error || 'Failed to fetch courses');
         }
       } catch (err) {
         console.error('Error fetching courses:', err);
@@ -136,7 +156,7 @@ const CoursesPage = () => {
         // For development: set some mock data to test UI
         if (process.env.NODE_ENV === 'development') {
           console.log('Using mock data for development');
-          const mockCourses: CourseWithRelations[] = [
+          const mockCourses: CourseWithExtras[] = [
             {
               id: '1',
               title: 'Introduction to Quranic Arabic',
@@ -144,28 +164,40 @@ const CoursesPage = () => {
               description: 'Learn the basics of Quranic Arabic',
               shortDesc: 'Basic Arabic for Quran understanding',
               level: 'BEGINNER',
-              duration: '8 weeks',
+              duration: 8, // Changed to number
               price: 99,
               isFree: false,
               featured: true,
               rating: 4.8,
               thumbnail: 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=800&h=500&fit=crop',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+              createdAt: new Date(), // Changed to Date object
+              updatedAt: new Date(), // Changed to Date object
               categories: [
                 {
                   category: {
                     id: '1',
                     name: 'Arabic',
-                    slug: 'arabic'
+                    slug: 'arabic',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
                   }
                 }
               ],
               _count: {
                 enrollments: 150,
-                reviews: 45,
-                modules: 5
-              }
+                modules: 5,
+                lessons: 20,
+                reviews: 45
+              },
+              avgRating: undefined,
+              reviewCount: 0,
+              studentCount: 0,
+              instructor: undefined,
+              objectives: false,
+              requirements: false,
+              status: undefined,
+              isPublished: false,
+              modules: []
             }
           ];
           setCourses(mockCourses);
@@ -180,7 +212,7 @@ const CoursesPage = () => {
   }, [selectedLevel, categories.length]);
 
   // Filter and sort courses
-  const filteredCourses = courses.filter((course: CourseWithRelations) => {
+  const filteredCourses = courses.filter((course: CourseWithExtras) => {
     // Check category match
     const matchesCategory = selectedCategory === 'All' || 
       (course.categories && course.categories.some((cat: any) => 
@@ -197,7 +229,7 @@ const CoursesPage = () => {
   });
 
   // Sort courses
-  const sortedCourses = [...filteredCourses].sort((a: CourseWithRelations, b: CourseWithRelations) => {
+  const sortedCourses = [...filteredCourses].sort((a: CourseWithExtras, b: CourseWithExtras) => {
     switch (sortBy) {
       case 'popular':
         return (b._count?.enrollments || 0) - (a._count?.enrollments || 0);
@@ -214,7 +246,7 @@ const CoursesPage = () => {
     }
   });
 
-  const featuredCourses = sortedCourses.filter((c: CourseWithRelations) => c.featured).slice(0, 3);
+  const featuredCourses = sortedCourses.filter((c: CourseWithExtras) => c.featured).slice(0, 3);
 
   console.log('Current state:', {
     coursesCount: courses.length,
@@ -274,31 +306,7 @@ const CoursesPage = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-8 sm:py-12 bg-white/70 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {stats.map((stat, index) => {
-              const Icon = stat.icon;
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="text-center p-4 sm:p-6 bg-white rounded-xl shadow-sm border border-gray-100"
-                >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  </div>
-                  <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-                  <div className="text-xs sm:text-sm text-gray-600">{stat.label}</div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+     
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Filters */}
@@ -477,8 +485,15 @@ const CoursesPage = () => {
   );
 };
 
-const CourseCard = ({ course, index, featured = false }: { course: CourseWithRelations; index: number; featured?: boolean }) => {
+const CourseCard = ({ course, index, featured = false }: { course: CourseWithExtras; index: number; featured?: boolean }) => {
   const defaultImage = 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=800&h=500&fit=crop';
+  
+  // Format duration to display properly
+  const formatDuration = (duration: number | undefined): string => {
+    if (!duration) return 'Self-paced';
+    if (duration === 1) return '1 week';
+    return `${duration} weeks`;
+  };
   
   return (
     <motion.a
@@ -526,7 +541,7 @@ const CourseCard = ({ course, index, featured = false }: { course: CourseWithRel
         <div className="flex items-center gap-2 mb-3 text-xs sm:text-sm text-gray-500">
           <div className="flex items-center gap-1">
             <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-gray-900">{course.rating || '4.8'}</span>
+            <span className="font-semibold text-gray-900">{course.rating || 4.8}</span>
             <span>({course._count?.reviews || 0})</span>
           </div>
           <span>•</span>
@@ -539,7 +554,7 @@ const CourseCard = ({ course, index, featured = false }: { course: CourseWithRel
         <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span>{course.duration || 'Self-paced'}</span>
+            <span>{formatDuration(course.duration)}</span>
           </div>
           <div className="flex items-center gap-1">
             <BookOpen className="w-3 h-3 sm:w-4 sm:h-4" />

@@ -1,7 +1,7 @@
 // src/controllers/BookController.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { BookModel } from '@/models/Book'
-import { AuthMiddleware, ApiResponse } from './AuthController'
+import { AuthMiddleware } from './AuthController'
 import { BookStatus, UserRole } from '@prisma/client'
 
 export class BookController {
@@ -9,7 +9,10 @@ export class BookController {
     try {
       const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
       if (authResult.error) {
-        return ApiResponse.error(authResult.error, 403)
+        return NextResponse.json(
+          { success: false, error: authResult.error },
+          { status: 403 }
+        )
       }
 
       const { 
@@ -35,7 +38,19 @@ export class BookController {
       }
 
       if (Object.keys(validationErrors).length > 0) {
-        return ApiResponse.validationError(validationErrors)
+        return NextResponse.json(
+          { success: false, error: 'Validation failed', details: validationErrors },
+          { status: 400 }
+        )
+      }
+
+      // Check if slug already exists
+      const existingBook = await BookModel.findBySlug(slug)
+      if (existingBook) {
+        return NextResponse.json(
+          { success: false, error: 'Book with this slug already exists' },
+          { status: 400 }
+        )
       }
 
       const book = await BookModel.create({
@@ -48,19 +63,25 @@ export class BookController {
         pages
       })
 
-      return ApiResponse.success(
-        book,
-        'Book created successfully',
-        201
-      )
+      return NextResponse.json({
+        success: true,
+        data: book,
+        message: 'Book created successfully'
+      }, { status: 201 })
     } catch (error: any) {
       console.error('Create book error:', error)
       
-      if (error.message.includes('Unique constraint')) {
-        return ApiResponse.error('Book with this slug already exists', 400)
+      if (error.code === 'P2002') {
+        return NextResponse.json(
+          { success: false, error: 'Book with this slug already exists' },
+          { status: 400 }
+        )
       }
       
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -68,7 +89,10 @@ export class BookController {
     try {
       const book = await BookModel.findBySlug(params.slug)
       if (!book) {
-        return ApiResponse.error('Book not found', 404)
+        return NextResponse.json(
+          { success: false, error: 'Book not found' },
+          { status: 404 }
+        )
       }
 
       // Only show published books to non-admins
@@ -77,13 +101,23 @@ export class BookController {
         [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role)
 
       if (book.status !== BookStatus.PUBLISHED && !isAdmin) {
-        return ApiResponse.error('Book not found', 404)
+        return NextResponse.json(
+          { success: false, error: 'Book not found' },
+          { status: 404 }
+        )
       }
 
-      return ApiResponse.success(book, 'Book retrieved successfully')
+      return NextResponse.json({
+        success: true,
+        data: book,
+        message: 'Book retrieved successfully'
+      })
     } catch (error) {
       console.error('Get book error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -91,16 +125,26 @@ export class BookController {
     try {
       const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
       if (authResult.error) {
-        return ApiResponse.error(authResult.error, 403)
+        return NextResponse.json(
+          { success: false, error: authResult.error },
+          { status: 403 }
+        )
       }
 
       const data = await req.json()
       const book = await BookModel.updateBook(params.id, data)
 
-      return ApiResponse.success(book, 'Book updated successfully')
+      return NextResponse.json({
+        success: true,
+        data: book,
+        message: 'Book updated successfully'
+      })
     } catch (error) {
       console.error('Update book error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -108,15 +152,25 @@ export class BookController {
     try {
       const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
       if (authResult.error) {
-        return ApiResponse.error(authResult.error, 403)
+        return NextResponse.json(
+          { success: false, error: authResult.error },
+          { status: 403 }
+        )
       }
 
       await BookModel.deleteBook(params.id)
 
-      return ApiResponse.success(null, 'Book deleted successfully')
+      return NextResponse.json({
+        success: true,
+        data: null,
+        message: 'Book deleted successfully'
+      })
     } catch (error) {
       console.error('Delete book error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -124,15 +178,25 @@ export class BookController {
     try {
       const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
       if (authResult.error) {
-        return ApiResponse.error(authResult.error, 403)
+        return NextResponse.json(
+          { success: false, error: authResult.error },
+          { status: 403 }
+        )
       }
 
       const book = await BookModel.publishBook(params.id)
 
-      return ApiResponse.success(book, 'Book published successfully')
+      return NextResponse.json({
+        success: true,
+        data: book,
+        message: 'Book published successfully'
+      })
     } catch (error) {
       console.error('Publish book error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -141,16 +205,25 @@ export class BookController {
       const { searchParams } = new URL(req.url)
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '10')
+      const search = searchParams.get('search') || undefined
 
       const result = await BookModel.getPublishedBooks({
         page,
-        limit
+        limit,
+        search
       })
 
-      return ApiResponse.success(result, 'Books retrieved successfully')
+      return NextResponse.json({
+        success: true,
+        data: result,
+        message: 'Books retrieved successfully'
+      })
     } catch (error) {
       console.error('Get published books error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
@@ -161,47 +234,77 @@ export class BookController {
 
       const books = await BookModel.getPopularBooks(limit)
 
-      return ApiResponse.success(books, 'Popular books retrieved successfully')
+      return NextResponse.json({
+        success: true,
+        data: books,
+        message: 'Popular books retrieved successfully'
+      })
     } catch (error) {
       console.error('Get popular books error:', error)
-      return ApiResponse.error('Internal server error')
+      return NextResponse.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
+      )
     }
   }
 
-
-static async downloadBook(req: NextRequest, { params }: { params: { id: string } }) {
+  static async downloadBook(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const book = await BookModel.findById(params.id)
     if (!book) {
-      return ApiResponse.error('Book not found', 404)
+      return NextResponse.json(
+        { success: false, error: 'Book not found' },
+        { status: 404 }
+      )
     }
 
     if (book.status !== BookStatus.PUBLISHED) {
-      return ApiResponse.error('Book not available for download', 400)
+      return NextResponse.json(
+        { success: false, error: 'Book not available for download' },
+        { status: 400 }
+      )
     }
 
     if (!book.fileUrl) {
-      return ApiResponse.error('Book file not available', 400)
+      return NextResponse.json(
+        { success: false, error: 'Book file not available' },
+        { status: 400 }
+      )
     }
+
+    // Get the file from your storage (adjust based on your storage solution)
+    const response = await fetch(book.fileUrl)
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch file')
+    }
+
+    // Get the file as blob
+    const fileBlob = await response.blob()
+    
+    // Get filename from URL or use book title
+    const filename = book.fileUrl.split('/').pop() || `${book.slug}.pdf`
+    const safeFilename = encodeURIComponent(filename)
 
     // Increment download count for analytics
     await BookModel.incrementDownloads(params.id)
 
-    // Return download URL (no authentication required)
-    return ApiResponse.success(
-      { 
-        downloadUrl: book.fileUrl,
-        book: {
-          title: book.title,
-          author: book.author,
-          description: book.description
-        }
+    // Return the file as a download
+    return new NextResponse(fileBlob, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${safeFilename}"`,
+        'Content-Length': fileBlob.size.toString(),
+        'Cache-Control': 'no-cache',
       },
-      'Download ready'
-    )
+    })
   } catch (error) {
     console.error('Download book error:', error)
-    return ApiResponse.error('Internal server error')
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 }
