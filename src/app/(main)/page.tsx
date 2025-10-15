@@ -116,11 +116,48 @@ const Homepage = () => {
 
   // Gallery images (placeholder - replace with actual images)
   const galleryImages = [
-    'https://images.unsplash.com/photo-1567767292278-a4f21aa2d36e?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop'
+    'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=764',
+    'https://images.unsplash.com/photo-1744264362119-bd94511b0597?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1156',
+    'https://images.unsplash.com/photo-1743427053878-1fedee64e2db?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170',
+    'https://images.unsplash.com/photo-1566346289693-a555ded1b37d?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1200',
+    'https://images.unsplash.com/photo-1612466163276-93e41076dcf0?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=677',
+    'https://plus.unsplash.com/premium_photo-1678483063222-b9cbc116b371?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=715'
   ];
+
+  // About section image
+  const aboutImage = '/images/astana.jpg';
+
+  // Gallery animation variants
+  const galleryVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  const imageVariants = {
+    hidden: { opacity: 0, scale: 0.8, y: 50 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    },
+    hover: {
+      scale: 1.05,
+      rotate: 2,
+      transition: {
+        duration: 0.3,
+        ease: "easeInOut"
+      }
+    }
+  };
 
   // Debug function to log API responses
   const debugResponse = (type: string, response: any) => {
@@ -332,105 +369,116 @@ const Homepage = () => {
       {/* Hero Slider */}
       <HeroSlider />
 
-      {/* About Section */}
+      {/* About Section with Image on Left */}
       <section className="py-16 sm:py-20 lg:py-24 bg-white/70 backdrop-blur-sm">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    {/* Section Intro */}
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-      className="text-center mb-12 lg:mb-16"
-    >
-      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-        Where Knowledge Meets the Light of the Heart
-      </h2>
-      <p className="text-lg sm:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-        <span className="font-semibold text-emerald-600">Khanqah Saifia</span> is more than an institute — it’s a sanctuary of learning and transformation. 
-        Guided by <span className="font-medium text-gray-800">Sarkar Wakeel Sahib Mubarik</span>, our purpose is to awaken hearts through 
-        <span className="italic"> authentic Islamic knowledge, Sufi guidance, and Tarbiyat</span>. 
-        Every class, every gathering, and every moment here is designed to help you draw closer to Allah with love, understanding, and clarity.
-      </p>
-    </motion.div>
-
-    {/* Features Grid */}
-    {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-      {[
-        {
-          title: 'Authentic Islamic Education',
-          description:
-            'Learn from trusted scholars and the timeless teachings of Qur’an and Sunnah.',
-          icon: BookOpen,
-          color: 'from-emerald-500 to-teal-500',
-        },
-        {
-          title: 'Spiritual Guidance & Tarbiyat',
-          description:
-            'Walk the Sufi path of purification under the mentorship of sincere guides.',
-          icon: Heart,
-          color: 'from-purple-500 to-pink-500',
-        },
-        {
-          title: 'Global Learning Community',
-          description:
-            'Join a worldwide family of seekers dedicated to knowledge and remembrance (Zikr).',
-          icon: Users,
-          color: 'from-blue-500 to-cyan-500',
-        },
-        {
-          title: 'Path of Love & Purity',
-          description:
-            'Transform your inner world through continuous learning, reflection, and devotion.',
-          icon: Sparkles,
-          color: 'from-amber-500 to-orange-500',
-        },
-      ].map((feature, index) => {
-        const Icon = feature.icon;
-        return (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: index * 0.1 }}
-            whileHover={{ y: -8, scale: 1.02 }}
-            className="group p-6 lg:p-8 bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-          >
-            <div
-              className={`w-14 h-14 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Image Section - Left Side */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="relative"
             >
-              <Icon className="w-7 h-7 text-white" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {feature.title}
-            </h3>
-            <p className="text-gray-600 leading-relaxed">{feature.description}</p>
-          </motion.div>
-        );
-      })}
-    </div> */}
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                <img
+                  src={aboutImage}
+                  alt="Khanqah Saifia - Spiritual Learning Center"
+                  className="w-full h-auto object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+              </div>
+              
+              {/* Decorative elements */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl rotate-12 shadow-xl"
+              ></motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="absolute -bottom-4 -left-4 w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl -rotate-12 shadow-xl"
+              ></motion.div>
+            </motion.div>
 
-    {/* Button CTA */}
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: 0.4 }}
-      className="text-center mt-12"
-    >
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2"
-      >
-        Discover Our Journey
-        <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>
-  </div>
-</section>
+            {/* Content Section - Right Side */}
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="space-y-6"
+            >
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+                Where Knowledge Meets the{' '}
+                <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+                  Light of the Heart
+                </span>
+              </h2>
+              
+              <p className="text-lg text-gray-600 leading-relaxed">
+                <span className="font-semibold text-emerald-600">Khanqah Saifia</span> is more than an institute — it's a sanctuary of learning and transformation. 
+                Guided by <span className="font-medium text-gray-800">Sarkar Wakeel Sahib Mubarik</span>, our purpose is to awaken hearts through 
+                <span className="italic"> authentic Islamic knowledge, Sufi guidance, and Tarbiyat</span>.
+              </p>
 
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Every class, every gathering, and every moment here is designed to help you draw closer to Allah with love, understanding, and clarity.
+              </p>
+
+              {/* Features Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                {[
+                  {
+                    title: 'Authentic Education',
+                    description: 'Qur\'an & Sunnah based learning',
+                    icon: BookOpen,
+                    color: 'from-emerald-500 to-teal-500'
+                  },
+                  {
+                    title: 'Spiritual Guidance',
+                    description: 'Sufi path of purification',
+                    icon: Heart,
+                    color: 'from-purple-500 to-pink-500'
+                  }
+                ].map((feature, index) => {
+                  const Icon = feature.icon;
+                  return (
+                    <motion.div
+                      key={index}
+                      whileHover={{ scale: 1.05 }}
+                      className="flex items-center gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100"
+                    >
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center flex-shrink-0`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-sm">{feature.title}</h3>
+                        <p className="text-xs text-gray-600">{feature.description}</p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2 mt-6"
+              >
+                Discover Our Journey
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
       {/* Five Pillars of Islam Section */}
       <section className="py-16 sm:py-20 lg:py-24 relative overflow-hidden">
@@ -549,8 +597,8 @@ const Homepage = () => {
         </div>
       </section>
 
-      {/* Gallery Section */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Gallery Section with Light Gradient and Animation */}
+      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -559,34 +607,45 @@ const Homepage = () => {
             transition={{ duration: 0.6 }}
             className="text-center mb-12 lg:mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
               Moments of Light and Reflection
             </h2>
-            <p className="text-lg sm:text-xl text-white/80 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
               A glimpse into our gatherings, study sessions, and moments of Zikr — capturing the beauty of spiritual companionship and learning.
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <motion.div
+            variants={galleryVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="grid grid-cols-2 md:grid-cols-3 gap-6"
+          >
             {galleryImages.map((image, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                className="relative overflow-hidden rounded-xl aspect-square"
+                variants={imageVariants}
+                whileHover="hover"
+                className="relative overflow-hidden rounded-2xl aspect-square group cursor-pointer"
               >
                 <img
                   src={image}
                   alt={`Gallery image ${index + 1}`}
-                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-black/20 hover:bg-black/10 transition-all duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500" />
+                <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <div className="text-white text-sm font-medium">
+                    Spiritual Moment {index + 1}
+                  </div>
+                </div>
+                
+                {/* Shine effect on hover */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
               </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -598,7 +657,7 @@ const Homepage = () => {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 bg-white text-gray-900 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2"
+              className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2"
             >
               View More Moments
               <ArrowRight className="w-5 h-5" />

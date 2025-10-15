@@ -34,30 +34,41 @@ const BooksPage = () => {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    totalBooks: 0,
+    totalDownloads: 0,
+    activeReaders: 0,
+    averageRating: 0
+  });
 
   const categories = ['All', 'Quran', 'Hadith', 'Fiqh', 'Aqeedah', 'Seerah', 'Spirituality', 'Arabic', 'History'];
   const languages = ['All', 'English', 'Arabic', 'Urdu', 'Turkish'];
 
-  const stats = [
-    { label: 'Total Books', value: '500+', icon: BookOpen },
-    { label: 'Total Downloads', value: '250K+', icon: Download },
-    { label: 'Active Readers', value: '50K+', icon: Eye },
-    { label: 'Average Rating', value: '4.8/5', icon: Star },
-  ];
+  // Debug function to log API responses
+  const debugResponse = (type: string, response: any) => {
+    console.log(`🔍 ${type} API Response:`, {
+      success: response.success,
+      data: response.data,
+      hasData: !!response.data,
+      dataStructure: response.data ? Object.keys(response.data) : 'no data',
+      fullResponse: response
+    });
+  };
 
   // Fetch books from API
   const fetchBooks = async () => {
     try {
       setLoading(true);
+      setError(null);
       console.log('📚 Fetching books from API...');
       
       const response = await apiClient.getPublicBooks({
         page: 1,
-        limit: 50, // Fetch more books to handle filtering
+        limit: 100, // Fetch more books to handle filtering
         status: 'PUBLISHED'
       });
 
-      console.log('📚 Books API Response:', response);
+      debugResponse('Books', response);
 
       if (response.success && response.data) {
         let booksData: any[] = [];
@@ -91,26 +102,53 @@ const BooksPage = () => {
             rating: book.rating || parseFloat((Math.random() * 0.5 + 4.5).toFixed(1)),
             reviews: book.reviews || book.reviewCount || Math.floor(Math.random() * 500) + 50,
             publishYear: book.publishYear || book.publishedAt?.substring(0, 4) || '2020',
-            featured: book.featured || Math.random() > 0.7,
+            featured: book.featured || false,
             status: book.status
           }));
+          
           console.log('📚 Mapped books:', mappedBooks);
           setBooks(mappedBooks);
+          
+          // Calculate stats from actual data
+          calculateStats(mappedBooks);
         } else {
-          console.log('📚 No books data from API, using fallback');
-          setBooks(getDefaultBooks());
+          console.log('📚 No books data found in API response');
+          setBooks([]);
+          setStats({
+            totalBooks: 0,
+            totalDownloads: 0,
+            activeReaders: 0,
+            averageRating: 0
+          });
         }
       } else {
-        console.log('📚 API response not successful, using fallback');
-        setBooks(getDefaultBooks());
+        console.log('📚 API response not successful');
+        setBooks([]);
       }
     } catch (err) {
       console.error('❌ Error fetching books:', err);
-      setError('Failed to load books');
-      setBooks(getDefaultBooks());
+      setError('Failed to load books. Please try again later.');
+      setBooks([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate statistics from books data
+  const calculateStats = (booksData: Book[]) => {
+    const totalBooks = booksData.length;
+    const totalDownloads = booksData.reduce((sum, book) => sum + book.downloads, 0);
+    const averageRating = booksData.length > 0 
+      ? booksData.reduce((sum, book) => sum + book.rating, 0) / booksData.length 
+      : 0;
+    const activeReaders = Math.floor(totalDownloads * 0.1); // Estimate active readers as 10% of downloads
+
+    setStats({
+      totalBooks,
+      totalDownloads,
+      activeReaders,
+      averageRating: parseFloat(averageRating.toFixed(1))
+    });
   };
 
   // Helper function for default book images
@@ -131,86 +169,6 @@ const BooksPage = () => {
     ];
     return images[Math.floor(Math.random() * images.length)];
   };
-
-  // Default fallback books
-  const getDefaultBooks = (): Book[] => [
-    {
-      id: '1',
-      slug: 'revival-religious-sciences',
-      title: 'Revival of Religious Sciences',
-      subtitle: 'Ihya Ulum al-Din',
-      author: 'Imam Al-Ghazali',
-      description: 'A comprehensive guide to Islamic spirituality and practice, covering purification of the heart, worship, and spiritual development',
-      cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop',
-      category: 'Spirituality',
-      language: 'English',
-      pages: 1248,
-      fileSize: '8.5 MB',
-      format: 'PDF',
-      downloads: 15420,
-      rating: 4.9,
-      reviews: 342,
-      publishYear: '2020',
-      featured: true,
-    },
-    {
-      id: '2',
-      slug: 'riyad-al-salihin',
-      title: 'Riyad al-Salihin',
-      subtitle: 'Gardens of the Righteous',
-      author: 'Imam An-Nawawi',
-      description: 'Collection of authentic hadiths for righteous living, organized by topics covering all aspects of Islamic life',
-      cover: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&h=600&fit=crop',
-      category: 'Hadith',
-      language: 'English',
-      pages: 892,
-      fileSize: '5.2 MB',
-      format: 'PDF',
-      downloads: 23150,
-      rating: 4.9,
-      reviews: 567,
-      publishYear: '2019',
-      featured: true,
-    },
-    {
-      id: '3',
-      slug: 'book-of-wisdom',
-      title: 'The Book of Wisdom',
-      subtitle: 'Kitab al-Hikam',
-      author: 'Ibn Ata Allah al-Iskandari',
-      description: 'Spiritual aphorisms and divine wisdom, offering profound insights into the nature of spiritual journey',
-      cover: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop',
-      category: 'Spirituality',
-      language: 'English',
-      pages: 156,
-      fileSize: '2.1 MB',
-      format: 'PDF',
-      downloads: 12890,
-      rating: 4.8,
-      reviews: 234,
-      publishYear: '2021',
-      featured: true,
-    },
-    {
-      id: '4',
-      slug: 'purification-of-heart',
-      title: 'Purification of the Heart',
-      subtitle: 'Signs, Symptoms and Cures',
-      author: 'Hamza Yusuf',
-      description: 'Exploration of spiritual diseases of the heart and their remedies according to Islamic tradition',
-      cover: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400&h=600&fit=crop',
-      category: 'Spirituality',
-      language: 'English',
-      pages: 312,
-      fileSize: '3.8 MB',
-      format: 'PDF',
-      downloads: 18250,
-      rating: 4.9,
-      reviews: 445,
-      publishYear: '2018',
-      featured: false,
-    }
-  ];
 
   useEffect(() => {
     fetchBooks();
@@ -254,6 +212,47 @@ const BooksPage = () => {
     </div>
   );
 
+  // Stats skeleton
+  const StatsSkeleton = () => (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-100 animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-8 mb-2"></div>
+          <div className="h-6 bg-gray-200 rounded mb-1"></div>
+          <div className="h-4 bg-gray-200 rounded w-16"></div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Empty state component
+  const EmptyState = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="text-center py-16 bg-white rounded-2xl border border-gray-200"
+    >
+      <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <BookOpen className="w-10 h-10 text-purple-600" />
+      </div>
+      <h3 className="text-2xl font-bold text-gray-900 mb-3">
+        Islamic Library Coming Soon
+      </h3>
+      <p className="text-gray-600 max-w-md mx-auto mb-6 leading-relaxed">
+        We're preparing an amazing collection of Islamic books for you. Our digital library will feature valuable resources on Quran, Hadith, Spirituality, and much more.
+      </p>
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 max-w-lg mx-auto">
+        <h4 className="font-semibold text-purple-900 mb-2">What to Expect:</h4>
+        <ul className="text-sm text-purple-800 space-y-1 text-left">
+          <li>• Classical Islamic texts and modern interpretations</li>
+          <li>• Multiple languages including English, Arabic, and Urdu</li>
+          <li>• Free downloads for all resources</li>
+          <li>• Featured books from renowned scholars</li>
+        </ul>
+      </div>
+    </motion.div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       {/* Error Display */}
@@ -282,7 +281,10 @@ const BooksPage = () => {
               Islamic Digital Library
             </h1>
             <p className="text-base sm:text-lg lg:text-xl text-white/90 mb-6 sm:mb-8 max-w-3xl mx-auto">
-              Access our extensive collection of Islamic books - Free to download and share
+              {books.length > 0 
+                ? `Access our collection of ${books.length}+ Islamic books - Free to download and share`
+                : 'Discover valuable Islamic resources - Coming soon with free downloads'
+              }
             </p>
 
             {/* Search Bar */}
@@ -302,95 +304,93 @@ const BooksPage = () => {
         </div>
       </section>
 
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      
+
         {/* Filters */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 sm:mb-12"
-        >
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            {/* Category Filter */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
-                      selectedCategory === category
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Language Filter */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value)}
-                className="w-full sm:w-48 px-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none cursor-pointer"
-              >
-                {languages.map((language) => (
-                  <option key={language} value={language}>{language}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
-
-            {/* Sort Filter */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full sm:w-48 px-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none cursor-pointer"
-              >
-                <option value="popular">Most Downloaded</option>
-                <option value="rating">Highest Rated</option>
-                <option value="newest">Newest</option>
-                <option value="title">Title (A-Z)</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
-
-            <div className="flex items-end">
-              <div className="text-sm text-gray-600">
-                {loading ? (
-                  'Loading books...'
-                ) : (
-                  <>
-                    Showing <span className="font-semibold">{filteredBooks.length}</span> books
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        
-
-        {/* All Books */}
-        <section>
+        {!loading && books.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 sm:mb-8"
+            className="mb-8 sm:mb-12"
           >
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-              {selectedCategory === 'All' ? 'All Books' : `${selectedCategory} Books`}
-            </h2>
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Category Filter */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
+                        selectedCategory === category
+                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 mt-4">
+              {/* Language Filter */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="w-full sm:w-48 px-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none cursor-pointer"
+                >
+                  {languages.map((language) => (
+                    <option key={language} value={language}>{language}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+
+              {/* Sort Filter */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full sm:w-48 px-4 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 appearance-none cursor-pointer"
+                >
+                  <option value="popular">Most Downloaded</option>
+                  <option value="rating">Highest Rated</option>
+                  <option value="newest">Newest</option>
+                  <option value="title">Title (A-Z)</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-[42px] w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
+
+              <div className="flex items-end">
+                <div className="text-sm text-gray-600">
+                  Showing <span className="font-semibold">{filteredBooks.length}</span> of{' '}
+                  <span className="font-semibold">{books.length}</span> books
+                </div>
+              </div>
+            </div>
           </motion.div>
+        )}
+
+        {/* All Books */}
+        <section>
+          {!loading && books.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 sm:mb-8"
+            >
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                {selectedCategory === 'All' ? 'All Books' : `${selectedCategory} Books`}
+              </h2>
+            </motion.div>
+          )}
 
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
@@ -398,28 +398,32 @@ const BooksPage = () => {
                 <BookSkeleton key={index} />
               ))}
             </div>
-          ) : filteredBooks.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
-              {filteredBooks.map((book, index) => (
-                <BookCard key={book.id} book={book} index={index} />
-              ))}
-            </div>
+          ) : books.length > 0 ? (
+            filteredBooks.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
+                {filteredBooks.map((book, index) => (
+                  <BookCard key={book.id} book={book} index={index} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
+                <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No books found</h3>
+                <p className="text-gray-500 mb-4">
+                  {searchQuery ? `No books found for "${searchQuery}"` : 'No books available in this category'}
+                </p>
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors"
+                  >
+                    Clear search
+                  </button>
+                )}
+              </div>
+            )
           ) : (
-            <div className="text-center py-12">
-              <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No books found</h3>
-              <p className="text-gray-500 mb-4">
-                {searchQuery ? `No books found for "${searchQuery}"` : 'No books available in this category'}
-              </p>
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                >
-                  Clear search
-                </button>
-              )}
-            </div>
+            <EmptyState />
           )}
         </section>
       </div>
@@ -427,7 +431,7 @@ const BooksPage = () => {
   );
 };
 
-const BookCard = ({ book, index, featured = false }) => {
+const BookCard = ({ book, index, featured = false }: { book: Book; index: number; featured?: boolean }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleDownload = async () => {
