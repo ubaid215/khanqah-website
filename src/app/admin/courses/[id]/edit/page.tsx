@@ -18,6 +18,11 @@ import {
 } from 'lucide-react'
 import { CourseWithRelations, CourseLevel, CourseStatus } from '@/types'
 
+interface Category {
+  id: string;
+  name: string;
+}
+
 export default function EditCoursePage() {
   const router = useRouter()
   const params = useParams()
@@ -27,6 +32,7 @@ export default function EditCoursePage() {
   const [isFetching, setIsFetching] = useState(true)
   const [course, setCourse] = useState<CourseWithRelations | null>(null)
   const [categories, setCategories] = useState<string[]>([])
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
   const [newCategory, setNewCategory] = useState('')
 
   const [formData, setFormData] = useState({
@@ -43,13 +49,28 @@ export default function EditCoursePage() {
 
   useEffect(() => {
     fetchCourse()
+    fetchAvailableCategories()
   }, [courseId])
+
+  // Fetch all available categories from the system
+  const fetchAvailableCategories = async () => {
+    try {
+      const response = await apiClient.getCategories()
+      if (response.success && response.data) {
+        setAvailableCategories(response.data)
+      } else if (Array.isArray(response)) {
+        setAvailableCategories(response)
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+    }
+  }
 
   const fetchCourse = async () => {
     try {
       const response = await apiClient.getCourseById(courseId)
       
-      // Fixed: Handle different response structures
+      // Handle different response structures
       const courseData = response.data || response
       
       if (courseData) {
@@ -66,11 +87,15 @@ export default function EditCoursePage() {
           status: courseData.status || CourseStatus.DRAFT
         })
         
-        // Set categories from response
+        // Extract category names from course data
         if (courseData.categories) {
-          setCategories(courseData.categories.map((cat: any) => 
-            cat.category?.name || cat.name || ''
-          ).filter(Boolean))
+          const categoryNames = courseData.categories.map((cat: any) => {
+            if (typeof cat === 'string') return cat
+            return cat.category?.name || cat.name || ''
+          }).filter(Boolean)
+          setCategories(categoryNames)
+        } else if (courseData.categoryNames) {
+          setCategories(courseData.categoryNames)
         }
       }
     } catch (error) {
@@ -81,20 +106,62 @@ export default function EditCoursePage() {
     }
   }
 
+  // Create new categories that don't exist and return their IDs
+  const createNewCategories = async (categoryNames: string[]): Promise<string[]> => {
+    const categoryIds: string[] = []
+    
+    for (const categoryName of categoryNames) {
+      const existingCategory = availableCategories.find(
+        cat => cat.name.toLowerCase() === categoryName.toLowerCase()
+      )
+      
+      if (existingCategory) {
+        categoryIds.push(existingCategory.id)
+      } else {
+        try {
+          // Create new category
+          const response = await apiClient.createCategory({
+            name: categoryName,
+            slug: ''
+          })
+          if (response.success && response.data) {
+            categoryIds.push(response.data.id)
+            // Add to available categories
+            setAvailableCategories(prev => [...prev, response.data])
+          } else if (response.id) {
+            categoryIds.push(response.id)
+            setAvailableCategories(prev => [...prev, { id: response.id, name: categoryName }])
+          }
+        } catch (error) {
+          console.error(`Failed to create category ${categoryName}:`, error)
+          // Continue with other categories even if one fails
+        }
+      }
+    }
+    
+    return categoryIds
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
+      // Create categories and get their IDs
+      const categoryIds = await createNewCategories(categories)
+      
       const updateData = {
         ...formData,
-        categoryIds: [] // You'll need to get category IDs
+        categoryIds // Send actual category IDs
       }
+      
+      console.log('Sending update data:', updateData)
       
       const response = await apiClient.updateCourse(courseId, updateData)
       
-      // Fixed: Check for success based on your API response
-      if (response) {
+      // Handle different response structures
+      if (response || response?.success) {
+        alert('Course updated successfully!')
         router.push('/admin/courses')
       } else {
         throw new Error('Failed to update course')
@@ -118,14 +185,26 @@ export default function EditCoursePage() {
     setCategories(categories.filter(cat => cat !== categoryToRemove))
   }
 
+  // Add existing category from dropdown
+  const handleAddExistingCategory = (categoryName: string) => {
+    if (categoryName && !categories.includes(categoryName)) {
+      setCategories([...categories, categoryName])
+    }
+  }
+
   const handlePublish = async () => {
     if (!confirm('Are you sure you want to publish this course?')) return
     
     try {
+      const categoryIds = await createNewCategories(categories)
+      
       await apiClient.updateCourse(courseId, {
+        ...formData,
+        categoryIds,
         status: CourseStatus.PUBLISHED,
         isPublished: true
       })
+      alert('Course published successfully!')
       router.push('/admin/courses')
     } catch (error: any) {
       console.error('Failed to publish course:', error)
@@ -313,11 +392,12 @@ export default function EditCoursePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Add new category */}
                 <div className="flex space-x-2">
                   <Input
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    placeholder="Add a category"
+                    placeholder="Add a new category"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
@@ -333,24 +413,58 @@ export default function EditCoursePage() {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Existing categories dropdown */}
+                {availableCategories.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Add Existing Categories
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddExistingCategory(e.target.value)
+                          e.target.value = '' // Reset selection
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select existing category</option>
+                      {availableCategories
+                        .filter(cat => !categories.includes(cat.name))
+                        .map((category) => (
+                          <option key={category.id} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                )}
                 
+                {/* Selected categories */}
                 {categories.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((category) => (
-                      <span
-                        key={category}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                      >
-                        {category}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCategory(category)}
-                          className="ml-2 hover:text-blue-600"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Selected Categories ({categories.length})
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((category) => (
+                        <span
+                          key={category}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
+                          {category}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCategory(category)}
+                            className="ml-2 hover:text-blue-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

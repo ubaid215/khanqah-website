@@ -25,7 +25,7 @@ const Footer = () => {
       title: 'Company',
       links: [
         { name: 'About Us', href: '/about' },
-        { name: 'Our Team', href: '/team' },
+        // { name: 'Our Team', href: '/team' },
         { name: 'Contact', href: '/contact' },
       ],
     },
@@ -33,9 +33,9 @@ const Footer = () => {
       title: 'Resources',
       links: [
         { name: 'Articles', href: '/articles' },
-        { name: 'Courses', href: '/courses' },
+        // { name: 'Courses', href: '/courses' },
         { name: 'Books', href: '/books' },
-        { name: 'Blog', href: '/blog' },
+        // { name: 'Blog', href: '/blog' },
       ],
     },
     support: {
@@ -81,7 +81,7 @@ const Footer = () => {
               Khanqah Saifia
             </h3>
             <p className="text-sm text-gray-400 mb-4">
-              Empowering people through education and innovation. Building the future, one course at a time.
+              Empowering people through education and innovation. Building the future.
             </p>
             <div className="space-y-2">
               {contactInfo.map((item, idx) => (

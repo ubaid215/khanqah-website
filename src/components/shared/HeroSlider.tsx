@@ -17,8 +17,8 @@ const HeroSlider = () => {
       "Discover the teachings of Tasawwuf and purify your heart through the guidance of Awliya Allah. Learn how to live with peace, purpose, and closeness to Allah.",
     image:
       "https://images.unsplash.com/photo-1526677504211-233c8477c61b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2070",
-    buttonText: "Explore Teachings",
-    buttonLink: "/courses",
+    buttonText: "Learn More",
+    buttonLink: "/about",
   },
   {
     id: 2,
@@ -28,8 +28,8 @@ const HeroSlider = () => {
       "Gain true Islamic understanding through authentic sources — Qur'an, Hadith, and the wisdom of scholars. Build your foundation of Deen with love and knowledge.",
     image:
       "https://images.unsplash.com/photo-1587617425953-9075d28b8c46?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
-    buttonText: "Start Learning",
-    buttonLink: "/courses",
+    buttonText: "Start Exploring",
+    buttonLink: "/articles",
   },
   {
     id: 3,
@@ -40,7 +40,7 @@ const HeroSlider = () => {
     image:
       "https://images.unsplash.com/photo-1575751639353-e292e76daca3?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
     buttonText: "Join the Community",
-    buttonLink: "/community",
+    buttonLink: "/",
   },
 ];
 

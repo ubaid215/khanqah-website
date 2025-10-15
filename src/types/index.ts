@@ -2,6 +2,7 @@
 
 // Core API response types
 export interface ApiResponse<T = any> {
+  status: any
   success: boolean
   data?: T
   error?: string
@@ -110,7 +111,38 @@ export interface CreateCourseData {
   categoryIds?: string[]
 }
 
+// Add to your types definition
+export interface PaginatedResponse<T> {
+  data: T;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface ArticleWithRelations {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  thumbnail?: string;
+  status: ArticleStatus;
+  readTime?: number;
+  views: number;
+  tags?: any[];
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    bookmarks: number;
+  };
+}
+
 export interface UpdateCourseData {
+  categoryIds: any
   title?: string
   description?: string
   shortDesc?: string
@@ -133,6 +165,8 @@ export interface CourseFilters {
 }
 
 export interface CourseWithRelations {
+  categoryNames: any
+  data: CourseWithRelations
   avgRating: any
   reviewCount: number
   studentCount: number

@@ -1,74 +1,155 @@
-// src/app/admin/courses/create/page.tsx
-"use client";
+'use client'
 
-import { SetStateAction, useState } from "react";
-import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
-import { ArrowLeft, Save, Plus, X, Upload, Loader2 } from "lucide-react";
-import { CourseLevel, CourseStatus } from "@/types";
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { apiClient } from '@/lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { Textarea } from '@/components/ui/Textarea'
+import { ArrowLeft, Save, Plus, X, Upload, Loader2 } from 'lucide-react'
+import { CourseLevel, CourseStatus } from '@/types'
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 export default function CreateCoursePage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [newCategory, setNewCategory] = useState("");
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
+  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
+  const [newCategory, setNewCategory] = useState('')
   const [formData, setFormData] = useState({
-    title: "",
-    slug: "",
-    description: "",
-    shortDesc: "",
-    thumbnail: "",
+    title: '',
+    slug: '',
+    description: '',
+    shortDesc: '',
+    thumbnail: '',
     level: CourseLevel.BEGINNER,
     price: 0,
     isFree: true,
-  });
+  })
+
+  useEffect(() => {
+    fetchAvailableCategories()
+  }, [])
+
+  // Fetch all available categories from the system
+  const fetchAvailableCategories = async () => {
+    try {
+      const response = await apiClient.getCategories()
+      if (response.success && response.data) {
+        setAvailableCategories(response.data)
+      } else if (Array.isArray(response)) {
+        setAvailableCategories(response)
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+    }
+  }
+
+  // Create new categories that don't exist and return their IDs
+  const createNewCategories = async (categoryNames: string[]): Promise<string[]> => {
+    const categoryIds: string[] = []
+    
+    for (const categoryName of categoryNames) {
+      const existingCategory = availableCategories.find(
+        cat => cat.name.toLowerCase() === categoryName.toLowerCase()
+      )
+      
+      if (existingCategory) {
+        categoryIds.push(existingCategory.id)
+      } else {
+        try {
+          // Create new category
+          const response = await apiClient.createCategory({
+            name: categoryName,
+            slug: ''
+          })
+          if (response.success && response.data) {
+            categoryIds.push(response.data.id)
+            // Add to available categories
+            setAvailableCategories(prev => [...prev, response.data])
+          } else if (response.id) {
+            categoryIds.push(response.id)
+            setAvailableCategories(prev => [...prev, { id: response.id, name: categoryName }])
+          }
+        } catch (error) {
+          console.error(`Failed to create category ${categoryName}:`, error)
+          // Continue with other categories even if one fails
+        }
+      }
+    }
+    
+    return categoryIds
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+    e.preventDefault()
+    setIsLoading(true)
 
     try {
+      // Create categories and get their IDs
+      const categoryIds = await createNewCategories(categories)
+      
       const courseData = {
         ...formData,
-        categoryIds: [], // You'll need to get category IDs from the category names
-      };
+        categoryIds, // Send actual category IDs
+        status: CourseStatus.DRAFT
+      }
 
-      const response = await apiClient.createCourse(courseData);
-      // Fixed: Check for success based on your actual API response structure
-      if (response) { // Adjust this condition based on your actual API response
-        router.push("/admin/courses");
+      console.log('Creating course with data:', courseData)
+
+      const response = await apiClient.createCourse(courseData)
+      
+      if (response || response?.success) {
+        alert('Course created successfully!')
+        router.push("/admin/courses")
       } else {
-        throw new Error("Failed to create course");
+        throw new Error("Failed to create course")
       }
     } catch (error: any) {
-      console.error("Failed to create course:", error);
-      alert(error.message || "Failed to create course");
+      console.error("Failed to create course:", error)
+      alert(error.message || "Failed to create course")
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
+
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      setCategories([...categories, newCategory.trim()])
+      setNewCategory('')
+    }
+  }
+
+  const handleRemoveCategory = (categoryToRemove: string) => {
+    setCategories(categories.filter(cat => cat !== categoryToRemove))
+  }
+
+  // Add existing category from dropdown
+  const handleAddExistingCategory = (categoryName: string) => {
+    if (categoryName && !categories.includes(categoryName)) {
+      setCategories([...categories, categoryName])
+    }
+  }
 
   // Helper function to get authentication token
   const getAuthToken = (): string | null => {
-    // Try different methods to get the token
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token') || 
              sessionStorage.getItem('token') ||
-             null;
+             null
     }
-    return null;
-  };
+    return null
+  }
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
     // Validate file type
     const allowedTypes = [
@@ -77,33 +158,32 @@ export default function CreateCoursePage() {
       "image/png",
       "image/webp",
       "image/gif",
-    ];
+    ]
     if (!allowedTypes.includes(file.type)) {
-      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)");
-      return;
+      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)")
+      return
     }
 
     // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 5 * 1024 * 1024
     if (file.size > maxSize) {
-      alert("File size must be less than 5MB");
-      return;
+      alert("File size must be less than 5MB")
+      return
     }
 
-    setIsUploading(true);
+    setIsUploading(true)
 
     try {
-      // Get the authentication token using the helper function
-      const token = getAuthToken();
+      const token = getAuthToken()
 
       if (!token) {
-        alert("Please log in to upload files");
-        setIsUploading(false);
-        return;
+        alert("Please log in to upload files")
+        setIsUploading(false)
+        return
       }
 
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", file);
+      const uploadFormData = new FormData()
+      uploadFormData.append("file", file)
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -111,38 +191,26 @@ export default function CreateCoursePage() {
           'Authorization': `Bearer ${token}`
         },
         body: uploadFormData,
-      });
+      })
 
-      const result = await response.json();
+      const result = await response.json()
 
       if (result.success) {
         setFormData((prev) => ({
           ...prev,
           thumbnail: result.data.url,
-        }));
+        }))
       } else {
-        alert(result.error || "Failed to upload file");
+        alert(result.error || "Failed to upload file")
       }
     } catch (error) {
-      console.error("Upload error:", error);
-      alert("Upload failed. Please try again.");
+      console.error("Upload error:", error)
+      alert("Upload failed. Please try again.")
     } finally {
-      setIsUploading(false);
-      // Reset the file input
-      event.target.value = "";
+      setIsUploading(false)
+      event.target.value = ""
     }
-  };
-
-  const handleAddCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()]);
-      setNewCategory("");
-    }
-  };
-
-  const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter((cat) => cat !== categoryToRemove));
-  };
+  }
 
   const generateSlug = (title: string) => {
     return title
@@ -150,16 +218,16 @@ export default function CreateCoursePage() {
       .replace(/[^a-z0-9 -]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
-      .trim();
-  };
+      .trim()
+  }
 
   const handleTitleChange = (title: string) => {
     setFormData((prev) => ({
       ...prev,
       title,
       slug: generateSlug(title),
-    }));
-  };
+    }))
+  }
 
   return (
     <div className="space-y-6">
@@ -200,9 +268,7 @@ export default function CreateCoursePage() {
                   </label>
                   <Input
                     value={formData.title}
-                    onChange={(e: { target: { value: string } }) =>
-                      handleTitleChange(e.target.value)
-                    }
+                    onChange={(e) => handleTitleChange(e.target.value)}
                     placeholder="Enter course title"
                     required
                   />
@@ -214,9 +280,7 @@ export default function CreateCoursePage() {
                   </label>
                   <Input
                     value={formData.slug}
-                    onChange={(e: { target: { value: any } }) =>
-                      setFormData((prev) => ({ ...prev, slug: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                     placeholder="course-slug"
                     required
                   />
@@ -231,12 +295,10 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.shortDesc}
-                    onChange={(e: { target: { value: any } }) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        shortDesc: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({
+                      ...prev,
+                      shortDesc: e.target.value,
+                    }))}
                     placeholder="Brief description of the course"
                     rows={3}
                   />
@@ -248,12 +310,10 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e: { target: { value: any } }) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => setFormData((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))}
                     placeholder="Detailed description of the course content"
                     rows={6}
                     required
@@ -270,20 +330,16 @@ export default function CreateCoursePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Add new category */}
                 <div className="flex space-x-2">
                   <Input
                     value={newCategory}
-                    onChange={(e: {
-                      target: { value: SetStateAction<string> };
-                    }) => setNewCategory(e.target.value)}
-                    placeholder="Add a category"
-                    onKeyPress={(e: {
-                      key: string;
-                      preventDefault: () => void;
-                    }) => {
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Add a new category"
+                    onKeyPress={(e) => {
                       if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddCategory();
+                        e.preventDefault()
+                        handleAddCategory()
                       }
                     }}
                   />
@@ -296,23 +352,57 @@ export default function CreateCoursePage() {
                   </Button>
                 </div>
 
+                {/* Existing categories dropdown */}
+                {availableCategories.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Add Existing Categories
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddExistingCategory(e.target.value)
+                          e.target.value = '' // Reset selection
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select existing category</option>
+                      {availableCategories
+                        .filter(cat => !categories.includes(cat.name))
+                        .map((category) => (
+                          <option key={category.id} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                )}
+
+                {/* Selected categories */}
                 {categories.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((category) => (
-                      <span
-                        key={category}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                      >
-                        {category}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCategory(category)}
-                          className="ml-2 hover:text-blue-600"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Selected Categories ({categories.length})
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((category) => (
+                        <span
+                          key={category}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
                         >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
+                          {category}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCategory(category)}
+                            className="ml-2 hover:text-blue-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -387,7 +477,7 @@ export default function CreateCoursePage() {
                         <Input
                           type="number"
                           value={formData.price}
-                          onChange={(e: { target: { value: string } }) =>
+                          onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
                               price: parseFloat(e.target.value),
@@ -515,5 +605,5 @@ export default function CreateCoursePage() {
         </div>
       </form>
     </div>
-  );
+  )
 }

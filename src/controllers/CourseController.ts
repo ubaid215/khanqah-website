@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CourseModel } from '@/models/Course'
-import { AuthMiddleware, ApiResponse } from './AuthController'
+import { AuthMiddleware, ApiResponse } from '@/controllers/AuthController'
 import { CourseLevel, CourseStatus, UserRole } from '@prisma/client'
 
 export class CourseController {
@@ -23,6 +23,14 @@ export class CourseController {
         categoryIds 
       } = await req.json()
 
+      console.log('📝 [CourseController] Creating course with data:', {
+        title,
+        slug,
+        categoryIds,
+        categoryIdsType: typeof categoryIds,
+        categoryIdsLength: categoryIds?.length
+      })
+
       // Validation
       const validationErrors: Record<string, string> = {}
       
@@ -38,6 +46,9 @@ export class CourseController {
         return ApiResponse.validationError(validationErrors)
       }
 
+      // Ensure categoryIds is always an array
+      const sanitizedCategoryIds = Array.isArray(categoryIds) ? categoryIds : []
+
       const course = await CourseModel.create({
         title,
         slug,
@@ -47,7 +58,13 @@ export class CourseController {
         level,
         price,
         isFree,
-        categoryIds
+        categoryIds: sanitizedCategoryIds
+      })
+
+      console.log('✅ [CourseController] Course created successfully:', {
+        id: course.id,
+        title: course.title,
+        categories: course.categories
       })
 
       return ApiResponse.success(
@@ -56,7 +73,7 @@ export class CourseController {
         201
       )
     } catch (error: any) {
-      console.error('Create course error:', error)
+      console.error('❌ [CourseController] Create course error:', error)
       
       if (error.message.includes('Unique constraint')) {
         return ApiResponse.error('Course with this slug already exists', 400)
@@ -67,61 +84,60 @@ export class CourseController {
   }
 
   static async getCourse(req: NextRequest, { params }: { params: { id?: string; slug?: string } }) {
-  console.log("📘 [CourseController] getCourse() called with params:", params);
+    console.log("📘 [CourseController] getCourse() called with params:", params);
 
-  try {
-    let course;
+    try {
+      let course;
 
-    // 🔹 Check what identifier is provided
-    if (params.id) {
-      console.log("🔍 Fetching course by ID:", params.id);
-      course = await CourseModel.findById(params.id);
-    } else if (params.slug) {
-      console.log("🔍 Fetching course by Slug:", params.slug);
-      course = await CourseModel.findBySlug(params.slug);
-    } else {
-      console.warn("⚠️ No course ID or slug provided in params");
-      return ApiResponse.error("Course ID or slug is required", 400);
+      // 🔹 Check what identifier is provided
+      if (params.id) {
+        console.log("🔍 Fetching course by ID:", params.id);
+        course = await CourseModel.findById(params.id);
+      } else if (params.slug) {
+        console.log("🔍 Fetching course by Slug:", params.slug);
+        course = await CourseModel.findBySlug(params.slug);
+      } else {
+        console.warn("⚠️ No course ID or slug provided in params");
+        return ApiResponse.error("Course ID or slug is required", 400);
+      }
+
+      // 🔹 Check if course was found
+      if (!course) {
+        console.warn("❌ Course not found for given params:", params);
+        return ApiResponse.error("Course not found", 404);
+      }
+
+      // 🔹 Verify authentication
+      console.log("🔑 Verifying authentication...");
+      const authResult = await AuthMiddleware.verifyAuth(req);
+      console.log("👤 Auth result:", authResult?.user ? `User: ${authResult.user.email}` : "No user");
+
+      // 🔹 Check admin privileges
+      const isAdmin =
+        authResult.user &&
+        [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
+      console.log("🛡️ Is Admin:", isAdmin);
+
+      // 🔹 Restrict unpublished courses for non-admin users
+      if (!course.isPublished && !isAdmin) {
+        console.warn("🚫 Unpublished course accessed by non-admin user");
+        return ApiResponse.error("Course not found", 404);
+      }
+
+      console.log("✅ Course retrieved successfully:", {
+        id: course.id,
+        title: course.title,
+        slug: course.slug,
+        isPublished: course.isPublished,
+        categories: course.categories
+      });
+
+      return ApiResponse.success(course, "Course retrieved successfully");
+    } catch (error: any) {
+      console.error("🔥 [getCourse] Internal server error:", error.message || error);
+      return ApiResponse.error("Internal server error");
     }
-
-    // 🔹 Check if course was found
-    if (!course) {
-      console.warn("❌ Course not found for given params:", params);
-      return ApiResponse.error("Course not found", 404);
-    }
-
-    // 🔹 Verify authentication
-    console.log("🔑 Verifying authentication...");
-    const authResult = await AuthMiddleware.verifyAuth(req);
-    console.log("👤 Auth result:", authResult?.user ? `User: ${authResult.user.email}` : "No user");
-
-    // 🔹 Check admin privileges
-    const isAdmin =
-      authResult.user &&
-      [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
-    console.log("🛡️ Is Admin:", isAdmin);
-
-    // 🔹 Restrict unpublished courses for non-admin users
-    if (!course.isPublished && !isAdmin) {
-      console.warn("🚫 Unpublished course accessed by non-admin user");
-      return ApiResponse.error("Course not found", 404);
-    }
-
-    console.log("✅ Course retrieved successfully:", {
-      id: course.id,
-      title: course.title,
-      slug: course.slug,
-      isPublished: course.isPublished,
-    });
-
-    return ApiResponse.success(course, "Course retrieved successfully");
-  } catch (error: any) {
-    console.error("🔥 [getCourse] Internal server error:", error.message || error);
-    return ApiResponse.error("Internal server error");
   }
-}
-
-
 
   static async updateCourse(req: NextRequest, { params }: { params: { id: string } }) {
     try {
@@ -131,11 +147,31 @@ export class CourseController {
       }
 
       const data = await req.json()
+      
+      console.log('📝 [CourseController] Updating course with data:', {
+        id: params.id,
+        data,
+        categoryIds: data.categoryIds,
+        categoryIdsType: typeof data.categoryIds,
+        categoryIdsLength: data.categoryIds?.length
+      })
+
+      // Ensure categoryIds is always an array
+      if (data.categoryIds !== undefined) {
+        data.categoryIds = Array.isArray(data.categoryIds) ? data.categoryIds : []
+      }
+
       const course = await CourseModel.updateCourse(params.id, data)
 
+      console.log('✅ [CourseController] Course updated successfully:', {
+        id: course.id,
+        title: course.title,
+        categories: course.categories
+      })
+
       return ApiResponse.success(course, 'Course updated successfully')
-    } catch (error) {
-      console.error('Update course error:', error)
+    } catch (error: any) {
+      console.error('❌ [CourseController] Update course error:', error)
       return ApiResponse.error('Internal server error')
     }
   }
@@ -270,88 +306,87 @@ export class CourseController {
     }
   }
 
- static async getLessonProgress(req: NextRequest, { params }: { params: { lessonId: string } }) {
-  console.log("📘 [LessonController] getLessonProgress() called with params:", params);
+  static async getLessonProgress(req: NextRequest, { params }: { params: { lessonId: string } }) {
+    console.log("📘 [LessonController] getLessonProgress() called with params:", params);
 
-  try {
-    // Step 1: Verify authentication
-    const authResult = await AuthMiddleware.verifyAuth(req);
-    console.log("👤 Auth verification result:", {
-      isAuthenticated: !authResult.error,
-      userId: authResult.user?.id,
-      userRole: authResult.user?.role,
-    });
-
-    if (authResult.error) {
-      console.warn("⚠️ Unauthorized access attempt for lesson progress:", {
-        lessonId: params.lessonId,
+    try {
+      // Step 1: Verify authentication
+      const authResult = await AuthMiddleware.verifyAuth(req);
+      console.log("👤 Auth verification result:", {
+        isAuthenticated: !authResult.error,
+        userId: authResult.user?.id,
+        userRole: authResult.user?.role,
       });
-      return ApiResponse.error(authResult.error, 401);
-    }
 
-    // Step 2: Fetch lesson progress
-    console.log("🔍 Fetching progress for:", {
-      lessonId: params.lessonId,
-      userId: authResult.user!.id,
-    });
+      if (authResult.error) {
+        console.warn("⚠️ Unauthorized access attempt for lesson progress:", {
+          lessonId: params.lessonId,
+        });
+        return ApiResponse.error(authResult.error, 401);
+      }
 
-    const progress = await CourseModel.getLessonProgress(params.lessonId, authResult.user!.id);
-
-    // Step 3: Check if progress exists
-    if (!progress) {
-      console.warn("❌ Lesson progress not found for:", {
+      // Step 2: Fetch lesson progress
+      console.log("🔍 Fetching progress for:", {
         lessonId: params.lessonId,
         userId: authResult.user!.id,
       });
-      return ApiResponse.error("Progress not found", 404);
+
+      const progress = await CourseModel.getLessonProgress(params.lessonId, authResult.user!.id);
+
+      // Step 3: Check if progress exists
+      if (!progress) {
+        console.warn("❌ Lesson progress not found for:", {
+          lessonId: params.lessonId,
+          userId: authResult.user!.id,
+        });
+        return ApiResponse.error("Progress not found", 404);
+      }
+
+      console.log("✅ Lesson progress retrieved successfully:", progress);
+
+      return ApiResponse.success(progress, "Lesson progress retrieved successfully");
+    } catch (error) {
+      console.error("💥 [LessonController] Get lesson progress error:", error);
+      return ApiResponse.error("Internal server error");
     }
-
-    console.log("✅ Lesson progress retrieved successfully:", progress);
-
-    return ApiResponse.success(progress, "Lesson progress retrieved successfully");
-  } catch (error) {
-    console.error("💥 [LessonController] Get lesson progress error:", error);
-    return ApiResponse.error("Internal server error");
   }
-}
-
 
   static async getUserEnrollments(req: NextRequest) {
-  try {
-    const authResult = await AuthMiddleware.verifyAuth(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 401)
+    try {
+      const authResult = await AuthMiddleware.verifyAuth(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 401)
+      }
+
+      // Use the CourseModel method to get actual enrollments
+      const enrollments = await CourseModel.getUserEnrollments(authResult.user!.id)
+
+      return ApiResponse.success(enrollments, 'Enrollments retrieved successfully')
+    } catch (error) {
+      console.error('Get user enrollments error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    // Use the CourseModel method to get actual enrollments
-    const enrollments = await CourseModel.getUserEnrollments(authResult.user!.id)
-
-    return ApiResponse.success(enrollments, 'Enrollments retrieved successfully')
-  } catch (error) {
-    console.error('Get user enrollments error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
-static async getUserEnrollment(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const authResult = await AuthMiddleware.verifyAuth(req)
-    if (authResult.error) {
-      return ApiResponse.error(authResult.error, 401)
+  static async getUserEnrollment(req: NextRequest, { params }: { params: { id: string } }) {
+    try {
+      const authResult = await AuthMiddleware.verifyAuth(req)
+      if (authResult.error) {
+        return ApiResponse.error(authResult.error, 401)
+      }
+
+      const enrollment = await CourseModel.getUserEnrollment(params.id, authResult.user!.id)
+      
+      if (!enrollment) {
+        return ApiResponse.error('Enrollment not found', 404)
+      }
+
+      return ApiResponse.success(enrollment, 'Enrollment retrieved successfully')
+    } catch (error) {
+      console.error('Get user enrollment error:', error)
+      return ApiResponse.error('Internal server error')
     }
-
-    const enrollment = await CourseModel.getUserEnrollment(params.id, authResult.user!.id)
-    
-    if (!enrollment) {
-      return ApiResponse.error('Enrollment not found', 404)
-    }
-
-    return ApiResponse.success(enrollment, 'Enrollment retrieved successfully')
-  } catch (error) {
-    console.error('Get user enrollment error:', error)
-    return ApiResponse.error('Internal server error')
   }
-}
 
   // Module and Lesson management
   static async createModule(req: NextRequest) {

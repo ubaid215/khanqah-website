@@ -1,6 +1,5 @@
-// src/controllers/ArticleController.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { ArticleModel } from '@/models/Article'
+import { prisma } from '@/lib/prisma' // Import prisma properly
 import { AuthMiddleware } from './AuthController'
 import { ArticleStatus, UserRole } from '@prisma/client'
 
@@ -43,23 +42,58 @@ export class ArticleController {
         )
       }
 
-      // Check if slug already exists
-      const existingArticle = await ArticleModel.findBySlug(slug)
+      // FIXED: Use imported prisma instance
+      const existingArticle = await prisma.article.findUnique({
+        where: { slug }
+      })
+
       if (existingArticle) {
         return NextResponse.json(
-          { success: false, error: 'Article with this slug already exists' },
+          { 
+            success: false, 
+            error: 'Article with this slug already exists',
+            code: 'SLUG_EXISTS'
+          },
           { status: 400 }
         )
       }
 
-      const article = await ArticleModel.create({
-        title,
-        slug,
-        content,
-        excerpt,
-        thumbnail,
-        tagNames,
-        readTime
+      // Generate a unique slug if needed
+      let finalSlug = slug
+      let slugCounter = 1
+      
+      while (await prisma.article.findUnique({ where: { slug: finalSlug } })) {
+        finalSlug = `${slug}-${slugCounter}`
+        slugCounter++
+      }
+
+      const article = await prisma.article.create({
+        data: {
+          title,
+          slug: finalSlug,
+          content,
+          excerpt: excerpt || null, // FIXED: Handle null properly
+          thumbnail: thumbnail || null,
+          readTime: readTime || null,
+          tags: tagNames && tagNames.length > 0 ? {
+            create: tagNames.map((tagName: string) => ({
+              tag: {
+                connectOrCreate: {
+                  where: { name: tagName.toLowerCase() },
+                  create: { 
+                    name: tagName.toLowerCase(),
+                    slug: tagName.toLowerCase().replace(/\s+/g, '-')
+                  }
+                }
+              }
+            }))
+          } : undefined
+        },
+        include: {
+          tags: {
+            include: { tag: true }
+          }
+        }
       })
 
       return NextResponse.json({
@@ -73,7 +107,11 @@ export class ArticleController {
       // Handle Prisma unique constraint error
       if (error.code === 'P2002') {
         return NextResponse.json(
-          { success: false, error: 'Article with this slug already exists' },
+          { 
+            success: false, 
+            error: 'Article with this slug already exists',
+            code: 'SLUG_EXISTS'
+          },
           { status: 400 }
         )
       }
@@ -85,38 +123,39 @@ export class ArticleController {
     }
   }
 
-  // Add this method to handle slug checking
-static async checkSlugAvailability(req: NextRequest, { params }: { params: { slug: string } }) {
-  try {
-    const { slug } = params
+  static async checkSlugAvailability(req: NextRequest, { params }: { params: { slug: string } }) {
+    try {
+      const { slug } = params
 
-    if (!slug || slug.length < 3) {
+      if (!slug || slug.length < 3) {
+        return NextResponse.json(
+          { success: false, error: 'Slug must be at least 3 characters' },
+          { status: 400 }
+        )
+      }
+
+      // Check if article with this slug exists
+      const existingArticle = await prisma.article.findUnique({
+        where: { slug }
+      })
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          available: !existingArticle,
+          slug: slug
+        }
+      })
+    } catch (error) {
+      console.error('Check slug availability error:', error)
       return NextResponse.json(
-        { success: false, error: 'Slug must be at least 3 characters' },
-        { status: 400 }
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
       )
     }
-
-    // Check if article with this slug exists
-    const existingArticle = await ArticleModel.findBySlug(slug)
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        available: !existingArticle,
-        slug: slug
-      }
-    })
-  } catch (error) {
-    console.error('Check slug availability error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
 
-// Update the getArticles method to ensure consistent response structure
+  
 static async getArticles(req: NextRequest) {
   try {
     console.log('🔍 [ArticleController] getArticles called');
@@ -131,59 +170,60 @@ static async getArticles(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as ArticleStatus | null
+    const statusParam = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50') // Increased limit for testing
+    const limit = parseInt(searchParams.get('limit') || '50')
 
     console.log('📋 [ArticleController] Query params:', {
-      status,
+      statusParam,
       page,
       limit,
       url: req.url
     });
 
-    // Build where clause - include ALL articles for admin
+    // Build where clause
     const where: any = {}
-    if (status && status !== 'all') {
-      where.status = status
+    if (statusParam && statusParam !== 'all') {
+      where.status = statusParam as ArticleStatus
+    } else {
+      console.log('🔍 [ArticleController] No status filter applied - getting ALL articles');
     }
-    // If no status filter or status is 'all', don't filter by status
 
-    console.log('🔍 [ArticleController] Prisma where clause:', where);
+    console.log('🔍 [ArticleController] Final Prisma where clause:', JSON.stringify(where));
 
-    const [articles, total] = await Promise.all([
-      prisma.article.findMany({
-        where,
-        include: {
-          tags: {
-            include: { tag: true }
-          },
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          _count: {
-            select: {
-              bookmarks: true
-            }
-          }
+    // FIXED: Add more detailed debugging
+    console.log('🔍 [ArticleController] About to query database...');
+    
+    const articles = await prisma.article.findMany({
+      where,
+      include: {
+        tags: {
+          include: { tag: true }
         },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      prisma.article.count({ where })
-    ])
+        _count: {
+          select: {
+            bookmarks: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit
+    })
 
-    console.log('📊 [ArticleController] Query results:', {
+    const total = await prisma.article.count({ where })
+
+    console.log('📊 [ArticleController] Database query results:', {
       articlesFound: articles.length,
-      totalArticles: total,
+      totalArticlesInDB: total,
       articleIds: articles.map(a => a.id),
-      articleTitles: articles.map(a => a.title)
+      articleTitles: articles.map(a => a.title),
+      sampleArticle: articles.length > 0 ? articles[0] : 'NO ARTICLES FOUND'
     });
+
+    // FIXED: Check if we have any articles in the database at all
+    const totalAllArticles = await prisma.article.count({})
+    console.log('📊 [ArticleController] Total articles in database (no filters):', totalAllArticles);
 
     return NextResponse.json({
       success: true,
@@ -218,7 +258,22 @@ static async getArticles(req: NextRequest) {
       }
 
       const data = await req.json()
-      const article = await ArticleModel.updateArticle(params.id, data)
+      
+      // FIXED: Use prisma directly for update
+      const article = await prisma.article.update({
+        where: { id: params.id },
+        data: {
+          ...data,
+          excerpt: data.excerpt || null,
+          thumbnail: data.thumbnail || null,
+          readTime: data.readTime || null
+        },
+        include: {
+          tags: {
+            include: { tag: true }
+          }
+        }
+      })
 
       return NextResponse.json({
         success: true,
@@ -244,7 +299,9 @@ static async getArticles(req: NextRequest) {
         )
       }
 
-      await ArticleModel.deleteArticle(params.id)
+      await prisma.article.delete({
+        where: { id: params.id }
+      })
 
       return NextResponse.json({
         success: true,
@@ -270,7 +327,18 @@ static async getArticles(req: NextRequest) {
         )
       }
 
-      const article = await ArticleModel.publishArticle(params.id)
+      const article = await prisma.article.update({
+        where: { id: params.id },
+        data: {
+          status: ArticleStatus.PUBLISHED,
+          publishedAt: new Date()
+        },
+        include: {
+          tags: {
+            include: { tag: true }
+          }
+        }
+      })
 
       return NextResponse.json({
         success: true,
@@ -293,15 +361,46 @@ static async getArticles(req: NextRequest) {
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '10')
 
-      const result = await ArticleModel.getPublishedArticles({
-        tagSlug,
-        page,
-        limit
-      })
+      const where: any = {
+        status: ArticleStatus.PUBLISHED
+      }
+
+      if (tagSlug) {
+        where.tags = {
+          some: {
+            tag: {
+              slug: tagSlug
+            }
+          }
+        }
+      }
+
+      const [articles, total] = await Promise.all([
+        prisma.article.findMany({
+          where,
+          include: {
+            tags: {
+              include: { tag: true }
+            }
+          },
+          orderBy: { publishedAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit
+        }),
+        prisma.article.count({ where })
+      ])
 
       return NextResponse.json({
         success: true,
-        data: result,
+        data: {
+          articles,
+          pagination: {
+            page,
+            limit,
+            total,
+            pages: Math.ceil(total / limit)
+          }
+        },
         message: 'Articles retrieved successfully'
       })
     } catch (error) {
@@ -315,7 +414,9 @@ static async getArticles(req: NextRequest) {
 
   static async getAllTags(req: NextRequest) {
     try {
-      const tags = await ArticleModel.getAllTags()
+      const tags = await prisma.tag.findMany({
+        orderBy: { name: 'asc' }
+      })
 
       return NextResponse.json({
         success: true,
@@ -336,7 +437,21 @@ static async getArticles(req: NextRequest) {
       const { searchParams } = new URL(req.url)
       const limit = parseInt(searchParams.get('limit') || '10')
 
-      const tags = await ArticleModel.getPopularTags(limit)
+      const tags = await prisma.tag.findMany({
+        include: {
+          _count: {
+            select: {
+              articles: true
+            }
+          }
+        },
+        orderBy: {
+          articles: {
+            _count: 'desc'
+          }
+        },
+        take: limit
+      })
 
       return NextResponse.json({
         success: true,

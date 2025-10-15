@@ -308,15 +308,45 @@ export class ApiClient {
     return response.data!
   }
 
-  async createCourse(courseData: CreateCourseData): Promise<CourseWithRelations> {
+   async createCourse(courseData: CreateCourseData): Promise<CourseWithRelations> {
+    console.log('📝 [apiClient] Creating course with data:', {
+      ...courseData,
+      categoryIds: courseData.categoryIds,
+      categoryIdsType: typeof courseData.categoryIds,
+      categoryIdsLength: courseData.categoryIds?.length
+    })
+
     const response = await this.post<CourseWithRelations>('/courses', courseData)
+    
+    console.log('✅ [apiClient] Course creation response:', {
+      success: response.success,
+      data: response.data,
+      categories: response.data?.categories
+    })
+
     return response.data!
   }
 
   async updateCourse(id: string, courseData: UpdateCourseData): Promise<CourseWithRelations> {
+    console.log('📝 [apiClient] Updating course with data:', {
+      id,
+      ...courseData,
+      categoryIds: courseData.categoryIds,
+      categoryIdsType: typeof courseData.categoryIds,
+      categoryIdsLength: courseData.categoryIds?.length
+    })
+
     const response = await this.put<CourseWithRelations>(`/courses/${id}`, courseData)
+    
+    console.log('✅ [apiClient] Course update response:', {
+      success: response.success,
+      data: response.data,
+      categories: response.data?.categories
+    })
+
     return response.data!
   }
+
 
   async deleteCourse(id: string): Promise<void> {
     await this.delete(`/courses/${id}`)
@@ -905,7 +935,42 @@ async uploadFileWithProgress(
 
   // ==================== CATEGORY METHODS ====================
   async getCategories(): Promise<any[]> {
-    const response = await this.get<any[]>('/categories')
+    try {
+      const response = await this.get<any[]>('/categories')
+      console.log('📚 [apiClient] Categories response:', {
+        success: response.success,
+        dataLength: response.data?.length,
+        data: response.data
+      })
+      return response.data!
+    } catch (error) {
+      console.error('❌ [apiClient] Failed to fetch categories:', error)
+      throw error
+    }
+  }
+
+  async createCategory(data: { name: string }): Promise<any> {
+    console.log('📝 [apiClient] Creating category:', data)
+    
+    // Generate slug from name
+    const slug = data.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+    
+    const categoryData = {
+      ...data,
+      slug,
+      icon: '📚' // Default icon
+    }
+
+    const response = await this.post<any>('/categories', categoryData)
+    
+    console.log('✅ [apiClient] Category creation response:', {
+      success: response.success,
+      data: response.data
+    })
+
     return response.data!
   }
 
@@ -914,10 +979,6 @@ async uploadFileWithProgress(
     return response.data!
   }
 
-  async createCategory(data: { name: string; slug: string; description?: string; icon?: string }): Promise<any> {
-    const response = await this.post<any>('/categories', data)
-    return response.data!
-  }
 
   async updateCategory(id: string, data: Partial<{ name: string; slug: string; description?: string; icon?: string }>): Promise<any> {
     const response = await this.put<any>(`/categories/${id}`, data)

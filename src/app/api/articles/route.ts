@@ -1,4 +1,3 @@
-// src/app/api/articles/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { ArticleController } from '@/controllers/ArticleController'
 import { requireAuth, requireAdmin } from '@/middleware/auth'
@@ -7,7 +6,8 @@ import { requireAuth, requireAdmin } from '@/middleware/auth'
 export const GET = requireAuth(requireAdmin(
   async (req: NextRequest) => {
     try {
-      return await ArticleController.getPublishedArticles(req)
+      // FIXED: Call getArticles instead of getPublishedArticles for admin
+      return await ArticleController.getArticles(req)
     } catch (error) {
       console.error('Get articles error:', error)
       return NextResponse.json(

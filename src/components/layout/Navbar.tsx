@@ -67,15 +67,15 @@ const Navbar: React.FC = () => {
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
     { name: 'Articles', href: '/articles' },
-    {
-      name: 'Courses',
-      href: '/courses',
-      submenu: [
-        { name: 'Web Development', href: '/courses' },
-        { name: 'Mobile Development', href: '/courses' },
-        { name: 'Data Science', href: '/courses' },
-      ],
-    },
+    // {
+    //   name: 'Courses',
+    //   href: '/courses',
+    //   submenu: [
+    //     { name: 'Taleem ul Quran', href: '/courses' },
+    //     { name: 'Hadith and Sunnah', href: '/courses' },
+    //     { name: 'Basics of Islam', href: '/courses' },
+    //   ],
+    // },
     { name: 'Books', href: '/books' },
   ];
 

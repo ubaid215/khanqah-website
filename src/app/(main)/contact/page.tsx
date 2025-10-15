@@ -15,12 +15,12 @@ const ContactPage = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
+  const handleChange = (e: { target: { name: any; value: any; }; }) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: { preventDefault: () => void; }) => {
     e.preventDefault();
     setIsSubmitting(true);
     // Simulate form submission
@@ -30,36 +30,7 @@ const ContactPage = () => {
     setFormData({ name: '', email: '', phone: '', subject: '', message: '' });
   };
 
-  const contactInfo = [
-    {
-      icon: Mail,
-      title: 'Email Us',
-      details: 'info@khanqahsaifia.com',
-      subDetails: 'support@khanqahsaifia.com',
-      color: 'from-blue-500 to-cyan-500',
-    },
-    {
-      icon: Phone,
-      title: 'Call Us',
-      details: '+1 (555) 123-4567',
-      subDetails: '+92 (300) 123-4567',
-      color: 'from-emerald-500 to-teal-500',
-    },
-    {
-      icon: MapPin,
-      title: 'Visit Us',
-      details: '123 Islamic Center Street',
-      subDetails: 'Lahore, Punjab, Pakistan',
-      color: 'from-purple-500 to-pink-500',
-    },
-    {
-      icon: Clock,
-      title: 'Working Hours',
-      details: 'Mon - Fri: 9:00 AM - 6:00 PM',
-      subDetails: 'Sat - Sun: 10:00 AM - 4:00 PM',
-      color: 'from-amber-500 to-orange-500',
-    },
-  ];
+ 
 
   const departments = [
     {
@@ -136,33 +107,6 @@ const ContactPage = () => {
         </div>
       </section>
 
-      {/* Contact Info Cards */}
-      <section className="py-8 sm:py-12 lg:py-16 -mt-12 sm:-mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {contactInfo.map((info, index) => {
-              const Icon = info.icon;
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -8 }}
-                  className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100"
-                >
-                  <div className={`w-12 h-12 bg-gradient-to-br ${info.color} rounded-xl flex items-center justify-center mb-4`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{info.title}</h3>
-                  <p className="text-sm text-gray-700 mb-1">{info.details}</p>
-                  <p className="text-sm text-gray-600">{info.subDetails}</p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
       {/* Main Content */}
       <section className="py-8 sm:py-12 lg:py-16">
@@ -196,7 +140,7 @@ const ContactPage = () => {
                         onChange={handleChange}
                         required
                         className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        placeholder="John Doe"
+                        placeholder="Full Name"
                       />
                     </div>
 
@@ -212,7 +156,7 @@ const ContactPage = () => {
                         onChange={handleChange}
                         required
                         className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        placeholder="john@example.com"
+                        placeholder="abc@gmail.com"
                       />
                     </div>
                   </div>
@@ -229,7 +173,7 @@ const ContactPage = () => {
                         value={formData.phone}
                         onChange={handleChange}
                         className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        placeholder="+1 (555) 123-4567"
+                        placeholder="+9230000000"
                       />
                     </div>
 
@@ -247,7 +191,6 @@ const ContactPage = () => {
                       >
                         <option value="">Select a subject</option>
                         <option value="general">General Inquiry</option>
-                        <option value="course">Course Information</option>
                         <option value="support">Technical Support</option>
                         <option value="enrollment">Enrollment</option>
                         <option value="feedback">Feedback</option>
@@ -384,7 +327,7 @@ const ContactPage = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-white">
+      {/* <section className="py-12 sm:py-16 lg:py-20 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -432,7 +375,7 @@ const ContactPage = () => {
             </a>
           </motion.div>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 };

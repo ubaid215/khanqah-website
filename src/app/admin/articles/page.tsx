@@ -1,4 +1,3 @@
-// src/app/admin/articles/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -36,81 +35,68 @@ export default function ArticlesPage() {
 
   useEffect(() => {
     fetchArticles()
-  }, [statusFilter]) // Refetch when status filter changes
+  }, [statusFilter])
 
   const showToast = (title: string, description?: string, variant: 'default' | 'destructive' | 'success' = 'default') => {
     setToast({ open: true, title, description, variant })
   }
 
   const fetchArticles = async () => {
-  try {
-    setIsLoading(true)
-    console.log('📚 Fetching articles with filter:', statusFilter)
-    
-    const response = await apiClient.getArticles({ 
-      status: statusFilter === 'all' ? undefined : statusFilter as ArticleStatus 
-    })
-    
-    console.log('📚 Full API response:', response)
-    
-    if (response.success) {
-      // Debug the response structure
-      console.log('🔍 Response data structure:', {
-        data: response.data,
-        hasData: !!response.data,
-        hasArticles: !!response.data?.articles,
-        articlesType: typeof response.data?.articles,
-        articlesLength: response.data?.articles?.length
-      });
-
-      // Extract articles from different possible structures
-      let articlesData: ArticleWithRelations[] = [];
+    try {
+      setIsLoading(true)
+      console.log('📚 Fetching articles with filter:', statusFilter)
       
-      if (response.data) {
-        // Structure 1: response.data.articles (most common)
-        if (response.data.articles && Array.isArray(response.data.articles)) {
-          articlesData = response.data.articles;
-          console.log('✅ Found articles in response.data.articles');
-        }
-        // Structure 2: response.data.data.articles (nested)
-        else if (response.data.data && response.data.data.articles && Array.isArray(response.data.data.articles)) {
-          articlesData = response.data.data.articles;
-          console.log('✅ Found articles in response.data.data.articles');
-        }
-        // Structure 3: response.data is directly the array
-        else if (Array.isArray(response.data)) {
-          articlesData = response.data;
-          console.log('✅ Found articles directly in response.data');
-        }
-        // Structure 4: Try to find any array in the response data
-        else {
-          // Look for any property that might be the articles array
-          const possibleArrays = Object.values(response.data).filter(val => Array.isArray(val));
-          if (possibleArrays.length > 0) {
-            articlesData = possibleArrays[0] as ArticleWithRelations[];
-            console.log('✅ Found articles in nested array property');
+      const response = await apiClient.getArticles({ 
+        status: statusFilter === 'all' ? undefined : statusFilter as ArticleStatus 
+      })
+      
+      console.log('📚 Full API response:', response)
+      
+      if (response.success) {
+        let articlesData: ArticleWithRelations[] = [];
+        
+        if (response.data) {
+          if (response.data.articles && Array.isArray(response.data.articles)) {
+            articlesData = response.data.articles;
+          } 
+          else if (Array.isArray(response.data)) {
+            articlesData = response.data;
+          }
+          else if (response.data.data && Array.isArray(response.data.data)) {
+            articlesData = response.data.data;
           }
         }
-      }
 
-      console.log('📚 Final processed articles:', {
-        count: articlesData.length,
-        articles: articlesData.map(a => ({ id: a.id, title: a.title, status: a.status }))
-      });
-      
-      setArticles(articlesData);
-    } else {
-      console.error('❌ API response not successful:', response)
+        console.log('📚 Final processed articles:', {
+          count: articlesData.length,
+          articles: articlesData.map(a => ({ id: a.id, title: a.title, status: a.status }))
+        });
+        
+        setArticles(articlesData);
+      } else {
+        console.error('❌ API response not successful:', response)
+        setArticles([])
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to fetch articles:', error)
+      showToast('Error', 'Failed to load articles', 'destructive')
       setArticles([])
+    } finally {
+      setIsLoading(false)
     }
-  } catch (error: any) {
-    console.error('❌ Failed to fetch articles:', error)
-    showToast('Error', 'Failed to load articles', 'destructive')
-    setArticles([])
-  } finally {
-    setIsLoading(false)
   }
-}
+
+  // FIXED: Only one filteredArticles definition
+  const filteredArticles = articles.filter(article => {
+    if (!article) return false;
+    
+    const matchesSearch = article.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         article.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (article.tags && article.tags.some((tag: any) => 
+                           tag.tag?.name.toLowerCase().includes(searchTerm.toLowerCase())
+                         )) || false
+    return matchesSearch
+  })
 
   const handleWriteArticle = () => {
     router.push('/admin/articles/create')
@@ -140,7 +126,7 @@ export default function ArticlesPage() {
   const handlePublishArticle = async (articleId: string) => {
     try {
       await apiClient.publishArticle(articleId)
-      await fetchArticles() // Refresh the list
+      await fetchArticles()
       showToast('Success', 'Article published successfully', 'success')
     } catch (error) {
       console.error('Failed to publish article:', error)
@@ -156,15 +142,6 @@ export default function ArticlesPage() {
       default: return 'bg-gray-100 text-gray-800'
     }
   }
-
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.excerpt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         article.tags?.some((tag: any) => 
-                           tag.tag?.name.toLowerCase().includes(searchTerm.toLowerCase())
-                         ) || false
-    return matchesSearch
-  })
 
   if (isLoading) {
     return (
