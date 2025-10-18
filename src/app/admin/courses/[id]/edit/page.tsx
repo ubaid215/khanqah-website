@@ -1,294 +1,369 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { apiClient } from '@/lib/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { 
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { apiClient } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import {
   ArrowLeft,
   Save,
   Plus,
   X,
   Upload,
   Loader2,
-  BookOpen
-} from 'lucide-react'
-import { CourseWithRelations, CourseLevel, CourseStatus } from '@/types'
+  BookOpen,
+} from "lucide-react";
+import { CourseWithRelations, CourseLevel, CourseStatus } from "@/types";
 
 interface Category {
   id: string;
   name: string;
 }
 
-export default function EditCoursePage() {
-  const router = useRouter()
-  const params = useParams()
-  const courseId = params.id as string
+// Define API response types
+interface ApiResponse<T> {
+  success?: boolean;
+  data?: T;
+  id?: string;
+  error?: string;
+}
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [isFetching, setIsFetching] = useState(true)
-  const [course, setCourse] = useState<CourseWithRelations | null>(null)
-  const [categories, setCategories] = useState<string[]>([])
-  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
-  const [newCategory, setNewCategory] = useState('')
+interface CategoriesResponse extends ApiResponse<Category[]> {
+  data: Category[];
+}
+
+interface CourseResponse extends ApiResponse<CourseWithRelations> {
+  data: CourseWithRelations;
+}
+
+interface UploadResponse {
+  success: boolean;
+  data?: {
+    url: string;
+  };
+  error?: string;
+}
+
+export default function EditCoursePage() {
+  const router = useRouter();
+  const params = useParams();
+  const courseId = params.id as string;
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [course, setCourse] = useState<CourseWithRelations | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<Category[]>(
+    []
+  );
+  const [newCategory, setNewCategory] = useState("");
 
   const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    shortDesc: '',
-    thumbnail: '',
+    title: "",
+    slug: "",
+    description: "",
+    shortDesc: "",
+    thumbnail: "",
     level: CourseLevel.BEGINNER,
     price: 0,
     isFree: true,
-    status: CourseStatus.DRAFT
-  })
+    status: CourseStatus.DRAFT,
+  });
 
   useEffect(() => {
-    fetchCourse()
-    fetchAvailableCategories()
-  }, [courseId])
+    fetchCourse();
+    fetchAvailableCategories();
+  }, [courseId]);
 
   // Fetch all available categories from the system
   const fetchAvailableCategories = async () => {
     try {
-      const response = await apiClient.getCategories()
-      if (response.success && response.data) {
-        setAvailableCategories(response.data)
-      } else if (Array.isArray(response)) {
-        setAvailableCategories(response)
+      const response = await apiClient.getCategories() as CategoriesResponse | Category[];
+
+      // Handle different response structures with proper type checking
+      if (Array.isArray(response)) {
+        // Direct array response
+        setAvailableCategories(response);
+      } else if (response && typeof response === "object") {
+        const apiResponse = response as CategoriesResponse;
+        // Object response with success and data properties
+        if (apiResponse.success && apiResponse.data) {
+          setAvailableCategories(apiResponse.data);
+        } else if (apiResponse.data) {
+          // Object response with data property
+          setAvailableCategories(apiResponse.data);
+        } else {
+          console.log(
+            "No categories found or unexpected response structure:",
+            response
+          );
+          setAvailableCategories([]);
+        }
+      } else {
+        console.log("Unexpected response type:", response);
+        setAvailableCategories([]);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error)
+      console.error("Failed to fetch categories:", error);
+      setAvailableCategories([]);
     }
-  }
+  };
 
   const fetchCourse = async () => {
     try {
-      const response = await apiClient.getCourseById(courseId)
-      
-      // Handle different response structures
-      const courseData = response.data || response
-      
+      const response = await apiClient.getCourseById(courseId) as CourseResponse | CourseWithRelations;
+
+      // Handle different response structures with proper type checking
+      let courseData: CourseWithRelations | null = null;
+
+      if (response && typeof response === "object") {
+        if ('data' in response) {
+          // Response has data property (ApiResponse structure)
+          courseData = (response as CourseResponse).data;
+        } else {
+          // Response is the course data directly
+          courseData = response as CourseWithRelations;
+        }
+      }
+
       if (courseData) {
-        setCourse(courseData)
+        setCourse(courseData);
         setFormData({
-          title: courseData.title || '',
-          slug: courseData.slug || '',
-          description: courseData.description || '',
-          shortDesc: courseData.shortDesc || '',
-          thumbnail: courseData.thumbnail || '',
+          title: courseData.title || "",
+          slug: courseData.slug || "",
+          description: courseData.description || "",
+          shortDesc: courseData.shortDesc || "",
+          thumbnail: courseData.thumbnail || "",
           level: courseData.level || CourseLevel.BEGINNER,
           price: courseData.price ? parseFloat(courseData.price.toString()) : 0,
           isFree: courseData.isFree ?? true,
-          status: courseData.status || CourseStatus.DRAFT
-        })
-        
+          status: courseData.status || CourseStatus.DRAFT,
+        });
+
         // Extract category names from course data
         if (courseData.categories) {
-          const categoryNames = courseData.categories.map((cat: any) => {
-            if (typeof cat === 'string') return cat
-            return cat.category?.name || cat.name || ''
-          }).filter(Boolean)
-          setCategories(categoryNames)
+          const categoryNames = courseData.categories
+            .map((cat: any) => {
+              if (typeof cat === "string") return cat;
+              return cat.category?.name || cat.name || "";
+            })
+            .filter(Boolean);
+          setCategories(categoryNames);
         } else if (courseData.categoryNames) {
-          setCategories(courseData.categoryNames)
+          setCategories(courseData.categoryNames);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch course:', error)
-      alert('Failed to load course')
+      console.error("Failed to fetch course:", error);
+      alert("Failed to load course");
     } finally {
-      setIsFetching(false)
+      setIsFetching(false);
     }
-  }
+  };
 
   // Create new categories that don't exist and return their IDs
-  const createNewCategories = async (categoryNames: string[]): Promise<string[]> => {
-    const categoryIds: string[] = []
-    
+  const createNewCategories = async (
+    categoryNames: string[]
+  ): Promise<string[]> => {
+    const categoryIds: string[] = [];
+
     for (const categoryName of categoryNames) {
       const existingCategory = availableCategories.find(
-        cat => cat.name.toLowerCase() === categoryName.toLowerCase()
-      )
-      
+        (cat) => cat.name.toLowerCase() === categoryName.toLowerCase()
+      );
+
       if (existingCategory) {
-        categoryIds.push(existingCategory.id)
+        categoryIds.push(existingCategory.id);
       } else {
         try {
           // Create new category
           const response = await apiClient.createCategory({
             name: categoryName,
-            slug: ''
-          })
+          }) as ApiResponse<Category>;
+          
           if (response.success && response.data) {
-            categoryIds.push(response.data.id)
+            categoryIds.push(response.data.id);
             // Add to available categories
-            setAvailableCategories(prev => [...prev, response.data])
+            setAvailableCategories((prev) => [...prev, response.data!]);
           } else if (response.id) {
-            categoryIds.push(response.id)
-            setAvailableCategories(prev => [...prev, { id: response.id, name: categoryName }])
+            categoryIds.push(response.id);
+            setAvailableCategories((prev) => [
+              ...prev,
+              { id: response.id!, name: categoryName },
+            ]);
           }
         } catch (error) {
-          console.error(`Failed to create category ${categoryName}:`, error)
+          console.error(`Failed to create category ${categoryName}:`, error);
           // Continue with other categories even if one fails
         }
       }
     }
-    
-    return categoryIds
-  }
+
+    return categoryIds;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
       // Create categories and get their IDs
-      const categoryIds = await createNewCategories(categories)
-      
+      const categoryIds = await createNewCategories(categories);
+
       const updateData = {
         ...formData,
-        categoryIds // Send actual category IDs
-      }
-      
-      console.log('Sending update data:', updateData)
-      
-      const response = await apiClient.updateCourse(courseId, updateData)
-      
-      // Handle different response structures
-      if (response || response?.success) {
-        alert('Course updated successfully!')
-        router.push('/admin/courses')
+        categoryIds, // Send actual category IDs
+      };
+
+      console.log("Sending update data:", updateData);
+
+      const response = await apiClient.updateCourse(courseId, updateData) as ApiResponse<CourseWithRelations>;
+
+      // Properly check the response structure with type safety
+      if (response && response.success) {
+        alert("Course updated successfully!");
+        router.push("/admin/courses");
+      } else if (response && response.id) {
+        // Alternative success check if the API returns the updated course directly
+        alert("Course updated successfully!");
+        router.push("/admin/courses");
       } else {
-        throw new Error('Failed to update course')
+        throw new Error("Failed to update course");
       }
     } catch (error: any) {
-      console.error('Failed to update course:', error)
-      alert(error.message || 'Failed to update course')
+      console.error("Failed to update course:", error);
+      alert(error.message || "Failed to update course");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()])
-      setNewCategory('')
+      setCategories([...categories, newCategory.trim()]);
+      setNewCategory("");
     }
-  }
+  };
 
   const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }
+    setCategories(categories.filter((cat) => cat !== categoryToRemove));
+  };
 
   // Add existing category from dropdown
   const handleAddExistingCategory = (categoryName: string) => {
     if (categoryName && !categories.includes(categoryName)) {
-      setCategories([...categories, categoryName])
+      setCategories([...categories, categoryName]);
     }
-  }
+  };
 
   const handlePublish = async () => {
-    if (!confirm('Are you sure you want to publish this course?')) return
-    
+    if (!confirm("Are you sure you want to publish this course?")) return;
+
     try {
-      const categoryIds = await createNewCategories(categories)
-      
+      const categoryIds = await createNewCategories(categories);
+
       await apiClient.updateCourse(courseId, {
         ...formData,
         categoryIds,
         status: CourseStatus.PUBLISHED,
-        isPublished: true
-      })
-      alert('Course published successfully!')
-      router.push('/admin/courses')
+        isPublished: true,
+      });
+      alert("Course published successfully!");
+      router.push("/admin/courses");
     } catch (error: any) {
-      console.error('Failed to publish course:', error)
-      alert(error.message || 'Failed to publish course')
+      console.error("Failed to publish course:", error);
+      alert(error.message || "Failed to publish course");
     }
-  }
+  };
 
   // File upload handler
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+    ];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please select a valid image file (JPEG, PNG, WebP, or GIF)')
-      return
+      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)");
+      return;
     }
 
     // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert('File size must be less than 5MB')
-      return
+      alert("File size must be less than 5MB");
+      return;
     }
 
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
-        alert('Please log in to upload files')
-        return
+        alert("Please log in to upload files");
+        return;
       }
 
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', file)
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
+      const response = await fetch("/api/upload", {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: uploadFormData,
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json() as UploadResponse;
 
-      if (result.success) {
-        setFormData(prev => ({
+      if (result.success && result.data) {
+        setFormData((prev) => ({
           ...prev,
-          thumbnail: result.data.url
-        }))
+          thumbnail: result.data!.url,
+        }));
       } else {
-        alert(result.error || 'Failed to upload file')
+        alert(result.error || "Failed to upload file");
       }
     } catch (error) {
-      console.error('Upload error:', error)
-      alert('Upload failed. Please try again.')
+      console.error("Upload error:", error);
+      alert("Upload failed. Please try again.");
     } finally {
       // Reset the file input
-      event.target.value = ''
+      event.target.value = "";
     }
-  }
+  };
 
   if (isFetching) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
-    )
+    );
   }
 
   if (!course) {
     return (
       <div className="text-center py-12">
         <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900">Course not found</h2>
-        <Button
-          onClick={() => router.push('/admin/courses')}
-          className="mt-4"
-        >
+        <h2 className="text-xl font-semibold text-gray-900">
+          Course not found
+        </h2>
+        <Button onClick={() => router.push("/admin/courses")} className="mt-4">
           Back to Courses
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -310,7 +385,7 @@ export default function EditCoursePage() {
             </p>
           </div>
         </div>
-        
+
         {course.status !== CourseStatus.PUBLISHED && (
           <Button
             onClick={handlePublish}
@@ -339,7 +414,12 @@ export default function EditCoursePage() {
                   </label>
                   <Input
                     value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
                     placeholder="Enter course title"
                     required
                   />
@@ -351,7 +431,9 @@ export default function EditCoursePage() {
                   </label>
                   <Input
                     value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, slug: e.target.value }))
+                    }
                     placeholder="course-slug"
                     required
                   />
@@ -363,7 +445,12 @@ export default function EditCoursePage() {
                   </label>
                   <Textarea
                     value={formData.shortDesc}
-                    onChange={(e) => setFormData(prev => ({ ...prev, shortDesc: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        shortDesc: e.target.value,
+                      }))
+                    }
                     placeholder="Brief description of the course"
                     rows={3}
                   />
@@ -375,7 +462,12 @@ export default function EditCoursePage() {
                   </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
                     placeholder="Detailed description of the course content"
                     rows={6}
                     required
@@ -399,9 +491,9 @@ export default function EditCoursePage() {
                     onChange={(e) => setNewCategory(e.target.value)}
                     placeholder="Add a new category"
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddCategory()
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCategory();
                       }
                     }}
                   />
@@ -423,25 +515,24 @@ export default function EditCoursePage() {
                     <select
                       onChange={(e) => {
                         if (e.target.value) {
-                          handleAddExistingCategory(e.target.value)
-                          e.target.value = '' // Reset selection
+                          handleAddExistingCategory(e.target.value);
+                          e.target.value = ""; // Reset selection
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select existing category</option>
                       {availableCategories
-                        .filter(cat => !categories.includes(cat.name))
+                        .filter((cat) => !categories.includes(cat.name))
                         .map((category) => (
                           <option key={category.id} value={category.name}>
                             {category.name}
                           </option>
-                        ))
-                      }
+                        ))}
                     </select>
                   </div>
                 )}
-                
+
                 {/* Selected categories */}
                 {categories.length > 0 && (
                   <div>
@@ -487,7 +578,12 @@ export default function EditCoursePage() {
                   </label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as CourseStatus }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        status: e.target.value as CourseStatus,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value={CourseStatus.DRAFT}>Draft</option>
@@ -502,11 +598,18 @@ export default function EditCoursePage() {
                   </label>
                   <select
                     value={formData.level}
-                    onChange={(e) => setFormData(prev => ({ ...prev, level: e.target.value as CourseLevel }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        level: e.target.value as CourseLevel,
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value={CourseLevel.BEGINNER}>Beginner</option>
-                    <option value={CourseLevel.INTERMEDIATE}>Intermediate</option>
+                    <option value={CourseLevel.INTERMEDIATE}>
+                      Intermediate
+                    </option>
                     <option value={CourseLevel.ADVANCED}>Advanced</option>
                   </select>
                 </div>
@@ -520,7 +623,13 @@ export default function EditCoursePage() {
                       <input
                         type="radio"
                         checked={formData.isFree}
-                        onChange={() => setFormData(prev => ({ ...prev, isFree: true, price: 0 }))}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            isFree: true,
+                            price: 0,
+                          }))
+                        }
                         className="mr-2"
                       />
                       Free
@@ -529,7 +638,9 @@ export default function EditCoursePage() {
                       <input
                         type="radio"
                         checked={!formData.isFree}
-                        onChange={() => setFormData(prev => ({ ...prev, isFree: false }))}
+                        onChange={() =>
+                          setFormData((prev) => ({ ...prev, isFree: false }))
+                        }
                         className="mr-2"
                       />
                       Paid
@@ -539,7 +650,12 @@ export default function EditCoursePage() {
                         <Input
                           type="number"
                           value={formData.price}
-                          onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              price: parseFloat(e.target.value),
+                            }))
+                          }
                           placeholder="0.00"
                           step="0.01"
                           min="0"
@@ -593,7 +709,9 @@ export default function EditCoursePage() {
                       variant="outline"
                       size="sm"
                       className="mt-2 text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={() => setFormData(prev => ({ ...prev, thumbnail: '' }))}
+                      onClick={() =>
+                        setFormData((prev) => ({ ...prev, thumbnail: "" }))
+                      }
                     >
                       <X className="h-3 w-3 mr-1" />
                       Remove
@@ -619,12 +737,12 @@ export default function EditCoursePage() {
                     )}
                     Update Course
                   </Button>
-                  
+
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full border-gray-300"
-                    onClick={() => router.push('/admin/courses')}
+                    onClick={() => router.push("/admin/courses")}
                   >
                     Cancel
                   </Button>
@@ -635,5 +753,5 @@ export default function EditCoursePage() {
         </div>
       </form>
     </div>
-  )
+  );
 }

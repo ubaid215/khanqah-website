@@ -61,6 +61,7 @@ class ApiError extends Error {
 }
 
 export class ApiClient {
+  [x: string]: any
   // Enhanced token management
   private getStoredToken(): string | null {
     if (typeof window === 'undefined') return null

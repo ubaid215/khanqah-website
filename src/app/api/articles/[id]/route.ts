@@ -7,7 +7,7 @@ import { requireAuth, requireAdmin } from '@/middleware/auth'
 export const GET = requireAuth(requireAdmin(
   async (req: NextRequest, { params }: { params: { id: string } }) => {
     try {
-      return await ArticleController.getArticle(req, { params })
+      return await ArticleController.getArticles(req, { params })
     } catch (error) {
       console.error('Get article error:', error)
       return NextResponse.json(

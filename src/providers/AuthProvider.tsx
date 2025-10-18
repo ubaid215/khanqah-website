@@ -9,10 +9,11 @@ interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
   register: (data: { name: string; email: string; password: string; username?: string }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+   updateUser: (userData: Partial<AuthUser>) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -39,6 +40,7 @@ const storage = {
     if (typeof window === 'undefined') return
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    localStorage.removeItem('rememberMe')
   }
 }
 
@@ -47,11 +49,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true)
   const isAuthenticated = !!user
 
-  // ✅ New: register function
   const register = async (data: { name: string; email: string; password: string; username?: string }) => {
     setIsLoading(true)
     try {
-      const response = await apiClient.register(data) // 🔹 Call your API route here
+      const response = await apiClient.register(data)
       if (response.user) {
         setUser(response.user)
         storage.setUser(response.user)
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     try {
       const response = await apiClient.getProfile()
       if (response.success && response.data) {
@@ -75,9 +76,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } else {
           sessionStorage.setItem('user', JSON.stringify(response.data))
         }
-        return true
+        return
       }
-      return false
+      // If no success, clear auth data
+      setUser(null)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        sessionStorage.removeItem('user')
+        sessionStorage.removeItem('token')
+      }
     } catch (error: any) {
       console.error('Failed to refresh user:', error)
       if (error.status === 401 || error.status === 403) {
@@ -89,16 +97,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
           sessionStorage.removeItem('token')
         }
       }
-      return false
     }
   }, [])
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe?: boolean) => {
     setIsLoading(true)
     try {
       const response = await apiClient.login({ email, password })
       setUser(response.user)
       storage.setUser(response.user)
+      
+      // Handle remember me functionality
+      if (rememberMe !== undefined) {
+        localStorage.setItem('rememberMe', rememberMe.toString())
+      }
     } catch (error) {
       storage.clear()
       throw error
@@ -106,6 +118,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(false)
     }
   }
+
+  const updateUser = (userData: Partial<AuthUser>) => {
+  setUser(prev => prev ? { ...prev, ...userData } : null)
+  if (userData) {
+    const currentUser = storage.getUser()
+    if (currentUser) {
+      storage.setUser({ ...currentUser, ...userData })
+    }
+  }
+}
 
   const logout = async () => {
     try {
@@ -137,11 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       try {
-        const success = await refreshUser()
-        if (mounted && !success) {
-          setUser(null)
-          storage.clear()
-        }
+        await refreshUser()
       } catch (error) {
         console.error('Auth check failed:', error)
         if (mounted) {
@@ -167,9 +185,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isLoading,
     isAuthenticated,
     login,
-    register, // ✅ Added here
+    register, 
     logout,
     refreshUser,
+    updateUser
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

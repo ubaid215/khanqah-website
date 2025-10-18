@@ -33,19 +33,37 @@ export default function BooksPage() {
   }, [])
 
   const fetchBooks = async () => {
-    try {
-      const response = await apiClient.getBooks({ 
-        status: statusFilter === 'all' ? undefined : statusFilter as BookStatus 
-      })
-      if (response.success) {
-        setBooks(response.data?.books || [])
+  try {
+    const response = await apiClient.getBooks({ 
+      status: statusFilter === 'all' ? undefined : statusFilter as BookStatus 
+    })
+    
+    if (response.success) {
+      // Handle different possible response structures
+      let booksData: BookWithRelations[] = []
+      
+      if (Array.isArray(response.data)) {
+        // Direct array response
+        booksData = response.data
+      } else if (response.data && Array.isArray(response.data.books)) {
+        // Paginated response with books array
+        booksData = response.data.books
+      } else if (response.data && Array.isArray(response.data.data)) {
+        // Alternative data structure
+        booksData = response.data.data
       }
-    } catch (error) {
-      console.error('Failed to fetch books:', error)
-    } finally {
-      setIsLoading(false)
+      
+      setBooks(booksData)
+    } else {
+      setBooks([])
     }
+  } catch (error) {
+    console.error('Failed to fetch books:', error)
+    setBooks([])
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleUploadBook = () => {
     router.push('/admin/books/create')

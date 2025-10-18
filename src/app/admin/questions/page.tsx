@@ -34,17 +34,27 @@ export default function QuestionsPage() {
   }, [])
 
   const fetchQuestions = async () => {
-    try {
-      const response = await apiClient.getQuestions()
-      if (response.success) {
-        setQuestions(response.data?.questions || [])
+  try {
+    const response = await apiClient.getQuestions()
+    if (response.success) {
+      // Handle different possible response structures
+      if (Array.isArray(response.data)) {
+        setQuestions(response.data)
+      } else if (response.data && Array.isArray(response.data.data)) {
+        setQuestions(response.data.data)
+      } else {
+        setQuestions([])
       }
-    } catch (error) {
-      console.error('Failed to fetch questions:', error)
-    } finally {
-      setIsLoading(false)
+    } else {
+      setQuestions([])
     }
+  } catch (error) {
+    console.error('Failed to fetch questions:', error)
+    setQuestions([])
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleDeleteQuestion = async (questionId: string) => {
     if (!confirm('Are you sure you want to delete this question?')) return

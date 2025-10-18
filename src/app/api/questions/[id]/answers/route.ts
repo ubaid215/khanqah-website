@@ -4,5 +4,5 @@ import { QuestionController } from '@/controllers/QusetionController'
 import { requireAuth } from '@/middleware/auth'
 
 export const POST = requireAuth(async (req: NextRequest, { params }: { params: { id: string } }) => {
-  return await QuestionController.createAnswer(req, { params })
+  return await QuestionController.createAnswer(req, { params: { questionId: params.id } })
 })

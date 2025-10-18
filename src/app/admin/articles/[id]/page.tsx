@@ -36,15 +36,15 @@ export default function EditArticlePage() {
   const [newTag, setNewTag] = useState('')
   const [uploadError, setUploadError] = useState('')
 
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    content: '',
-    excerpt: '',
-    thumbnail: '',
-    readTime: 5,
-    status: ArticleStatus.DRAFT
-  })
+ const [formData, setFormData] = useState({
+  title: '',
+  slug: '',
+  content: '',
+  excerpt: '',
+  thumbnail: '',
+  readTime: 5,
+  status: ArticleStatus.DRAFT as ArticleStatus 
+})
 
   useEffect(() => {
     fetchArticle()

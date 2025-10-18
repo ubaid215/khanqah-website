@@ -1,90 +1,296 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, Eye, Share2, Bookmark, ChevronLeft, ChevronRight, Tag, Heart, MessageCircle } from 'lucide-react';
-import { useState } from 'react';
+import { Calendar, Clock, User, Eye, Share2, Bookmark, ChevronLeft, ChevronRight, Tag, Heart, MessageCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api';
+
+interface Article {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  thumbnail: string;
+  status: string;
+  readTime: number;
+  views: number;
+  createdAt: string;
+  publishedAt: string;
+  tags: Array<{
+    tag: {
+      id: string;
+      name: string;
+      slug: string;
+    };
+  }>;
+  author?: {
+    id: string;
+    name: string;
+    email: string;
+    image: string;
+    bio: string;
+  };
+  _count?: {
+    bookmarks: number;
+  };
+}
+
+interface RelatedArticle {
+  id: string;
+  slug: string;
+  title: string;
+  thumbnail: string;
+  readTime: number;
+  tags: Array<{
+    tag: {
+      name: string;
+    };
+  }>;
+}
+
+// Define API response types - handle both direct data and wrapped responses
+interface ApiResponse<T> {
+  success?: boolean;
+  data?: T;
+  id?: string;
+  error?: string;
+}
+
+// More flexible response types that can handle different API response structures
+type ArticleResponse = Article | ApiResponse<Article>;
+
+interface ArticlesListResponse {
+  success?: boolean;
+  data?: {
+    articles: RelatedArticle[];
+    total: number;
+  };
+  articles?: RelatedArticle[];
+  total?: number;
+}
 
 const ArticleDetailPage = () => {
+  const params = useParams();
+  const router = useRouter();
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [likes, setLikes] = useState(245);
+  const [likes, setLikes] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [article, setArticle] = useState<Article | null>(null);
+  const [relatedArticles, setRelatedArticles] = useState<RelatedArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const article = {
-    id: 1,
-    slug: 'importance-of-daily-dhikr',
-    title: 'The Importance of Daily Dhikr in Spiritual Growth',
-    excerpt: 'Discover how regular remembrance of Allah transforms the heart and brings peace to the soul through consistent spiritual practice.',
-    content: `
-      <h2>Introduction</h2>
-      <p>In the journey of spiritual development, few practices hold as much transformative power as dhikr - the remembrance of Allah. This sacred practice, deeply rooted in Islamic tradition, serves as a beacon of light guiding believers towards inner peace and spiritual enlightenment.</p>
-      
-      <p>The Prophet Muhammad (peace be upon him) emphasized the significance of dhikr in numerous hadith, describing it as the polish that removes the rust from hearts. Just as a mirror requires regular cleaning to reflect clearly, our hearts need the constant remembrance of Allah to maintain their spiritual clarity.</p>
+  // Helper function to extract article data from different response structures
+  const extractArticleData = (response: ArticleResponse): Article | null => {
+    if (!response) return null;
 
-      <h2>The Spiritual Benefits of Dhikr</h2>
-      <p>When we engage in regular dhikr, we create a direct connection with the Divine. This practice transcends mere words; it becomes a state of consciousness that permeates every aspect of our lives. The heart that remembers Allah finds tranquility in His remembrance, as mentioned in the Quran: "Verily, in the remembrance of Allah do hearts find rest" (13:28).</p>
+    // If response is already an Article (direct response)
+    if ('id' in response && 'title' in response) {
+      return response as Article;
+    }
 
-      <p>Regular dhikr cultivates mindfulness and presence, allowing us to break free from the distractions of worldly life. It serves as an anchor, keeping us grounded in our faith even amidst life's storms. Through consistent practice, we develop a heightened awareness of Allah's presence in every moment.</p>
+    // If response is an ApiResponse with data property
+    const apiResponse = response as ApiResponse<Article>;
+    if (apiResponse.data && 'id' in apiResponse.data) {
+      return apiResponse.data;
+    }
 
-      <h2>Practical Implementation</h2>
-      <p>Beginning a dhikr practice doesn't require elaborate preparations. Start with simple phrases like "SubhanAllah" (Glory be to Allah), "Alhamdulillah" (All praise is due to Allah), and "Allahu Akbar" (Allah is the Greatest). These powerful expressions can be repeated throughout the day, transforming routine moments into opportunities for spiritual connection.</p>
+    // If response has success property but data might be the article itself
+    if (apiResponse.success && 'id' in apiResponse) {
+      return apiResponse as unknown as Article;
+    }
 
-      <p>The early morning hours, particularly the time before Fajr prayer, offer a special opportunity for dhikr. The stillness of these moments creates an ideal environment for deep spiritual reflection and connection with the Divine.</p>
-
-      <h2>Overcoming Challenges</h2>
-      <p>Many seekers struggle with maintaining consistency in their dhikr practice. The key lies in starting small and gradually building the habit. Even a few minutes of sincere remembrance daily can create profound changes in one's spiritual state. Quality surpasses quantity - it's better to have five minutes of focused, heartfelt dhikr than an hour of mechanical repetition.</p>
-
-      <h2>The Transformative Power</h2>
-      <p>As we persist in our dhikr practice, we begin to notice subtle but significant changes. Our perspective shifts, our patience increases, and our hearts become more receptive to divine guidance. The practice becomes a source of strength during difficult times and a means of expressing gratitude during moments of joy.</p>
-
-      <p>The scholars of tasawwuf (Islamic spirituality) describe dhikr as the food of the soul. Just as our bodies require regular nourishment, our souls need the constant remembrance of Allah to thrive and grow. Through this practice, we align ourselves with our true purpose and find the peace that our hearts naturally seek.</p>
-
-      <h2>Conclusion</h2>
-      <p>Daily dhikr is not merely a religious obligation; it's a gift that Allah has given us to maintain our connection with Him. As we incorporate this practice into our daily lives, we embark on a transformative journey that brings us closer to our Creator and helps us realize our spiritual potential. May Allah grant us consistency in His remembrance and allow our hearts to find peace in His dhikr.</p>
-    `,
-    image: 'https://images.unsplash.com/photo-1610728488568-88c9f634d4d9?w=1200&h=600&fit=crop',
-    category: 'Spirituality',
-    tags: ['Dhikr', 'Spiritual Growth', 'Islamic Practice', 'Mindfulness'],
-    author: {
-      name: 'Sheikh Abdullah Ahmad',
-      bio: 'Islamic scholar and spiritual guide with over 20 years of teaching experience',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-    },
-    date: '2024-03-15',
-    readTime: '8 min read',
-    views: '2.4k',
+    return null;
   };
 
-  const relatedArticles = [
-    {
-      id: 2,
-      slug: 'understanding-tazkiyah',
-      title: 'Understanding Tazkiyah: Purification of the Soul',
-      image: 'https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=400&h=300&fit=crop',
-      category: 'Self-Development',
-      readTime: '12 min read',
-    },
-    {
-      id: 3,
-      slug: 'path-of-sufism',
-      title: 'The Path of Sufism: Inner Dimensions',
-      image: 'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=400&h=300&fit=crop',
-      category: 'Spirituality',
-      readTime: '10 min read',
-    },
-    {
-      id: 4,
-      slug: 'quran-recitation-benefits',
-      title: 'Spiritual Benefits of Quran Recitation',
-      image: 'https://images.unsplash.com/photo-1585506019033-e6e14d8b0c70?w=400&h=300&fit=crop',
-      category: 'Quran',
-      readTime: '7 min read',
-    },
-  ];
+  // Helper function to extract related articles from response
+  const extractRelatedArticles = (response: ArticlesListResponse): RelatedArticle[] => {
+    if (!response) return [];
 
-  const handleLike = () => {
-    setIsLiked(!isLiked);
-    setLikes(isLiked ? likes - 1 : likes + 1);
+    // If response has data.articles
+    if (response.data?.articles) {
+      return response.data.articles;
+    }
+
+    // If response has direct articles array
+    if (response.articles) {
+      return response.articles;
+    }
+
+    // If response is an array (direct array response)
+    if (Array.isArray(response)) {
+      return response as RelatedArticle[];
+    }
+
+    return [];
   };
+
+  // Fetch article data
+  useEffect(() => {
+    const fetchArticle = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const slug = params.slug as string;
+        const response = await apiClient.getArticleBySlug(slug) as ArticleResponse;
+        
+        const articleData = extractArticleData(response);
+        
+        if (articleData) {
+          // Transform the response data to match our Article interface
+          const transformedArticle: Article = {
+            ...articleData,
+            excerpt: articleData.excerpt || '',
+            thumbnail: articleData.thumbnail || 'https://images.unsplash.com/photo-1610728488568-88c9f634d4d9?w=1200&h=600&fit=crop',
+            readTime: articleData.readTime || 5,
+            views: articleData.views || 0,
+            publishedAt: articleData.publishedAt || articleData.createdAt,
+            tags: articleData.tags || [],
+            author: articleData.author ? {
+              ...articleData.author,
+              image: articleData.author.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(articleData.author.name)}&size=100`,
+              bio: articleData.author.bio || 'Article author'
+            } : undefined
+          };
+          
+          setArticle(transformedArticle);
+          
+          // Fetch related articles based on tags
+          if (articleData.tags && articleData.tags.length > 0) {
+            const tagSlug = articleData.tags[0].tag.slug;
+            const relatedResponse = await apiClient.getPublishedArticles({
+              tag: tagSlug,
+              limit: 3
+            }) as ArticlesListResponse;
+            
+            const relatedArticlesData = extractRelatedArticles(relatedResponse);
+            
+            if (relatedArticlesData.length > 0) {
+              // Filter out current article and limit to 3
+              const filtered = relatedArticlesData
+                .filter((a: RelatedArticle) => a.id !== articleData.id)
+                .slice(0, 3);
+              setRelatedArticles(filtered);
+            }
+          }
+        } else {
+          setError('Article not found');
+        }
+      } catch (err) {
+        console.error('Error fetching article:', err);
+        setError('Failed to load article');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.slug) {
+      fetchArticle();
+    }
+  }, [params.slug]);
+
+  const handleLike = async () => {
+    if (!article) return;
+    
+    try {
+      // TODO: Implement like functionality in your API
+      setIsLiked(!isLiked);
+      setLikes(isLiked ? likes - 1 : likes + 1);
+    } catch (error) {
+      console.error('Error liking article:', error);
+    }
+  };
+
+  const handleBookmark = async () => {
+    if (!article) return;
+    
+    try {
+      if (isBookmarked) {
+        // Remove bookmark
+        await apiClient.deleteBookmark(article.id);
+      } else {
+        // Add bookmark
+        await apiClient.createBookmark({
+          articleId: article.id,
+          type: 'ARTICLE'
+        });
+      }
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error('Error bookmarking article:', error);
+    }
+  };
+
+  const handleShare = async (platform: string) => {
+    if (!article) return;
+    
+    const shareUrl = window.location.href;
+    const title = article.title;
+    
+    switch (platform) {
+      case 'facebook':
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      case 'twitter':
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+        break;
+      case 'whatsapp':
+        window.open(`https://wa.me/?text=${encodeURIComponent(title + ' ' + shareUrl)}`, '_blank');
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(shareUrl);
+        alert('Link copied to clipboard!');
+        break;
+    }
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !article) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Eye className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Article Not Found</h2>
+          <p className="text-gray-600 mb-6">{error || 'The article you are looking for does not exist.'}</p>
+          <button
+            onClick={() => router.push('/articles')}
+            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-teal-600 transition-all"
+          >
+            Back to Articles
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  // Get category from tags (use first tag as category)
+  const category = article.tags.length > 0 ? article.tags[0].tag.name : 'General';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
@@ -95,15 +301,15 @@ const ArticleDetailPage = () => {
         className="relative w-full h-48 sm:h-64 md:h-80 lg:h-96 overflow-hidden"
       >
         <img
-          src={article.image}
+          src={article.thumbnail}
           alt={article.title}
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         
         {/* Back Button */}
-        <motion.a
-          href="/articles"
+        <motion.button
+          onClick={() => router.push('/articles')}
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
@@ -112,11 +318,11 @@ const ArticleDetailPage = () => {
           <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           <span className="hidden sm:inline">Back to Articles</span>
           <span className="sm:hidden">Back</span>
-        </motion.a>
+        </motion.button>
 
         {/* Category Badge */}
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6 px-3 py-1 bg-emerald-600 text-white text-xs sm:text-sm font-semibold rounded-full">
-          {article.category}
+          {category}
         </div>
       </motion.div>
 
@@ -140,12 +346,12 @@ const ArticleDetailPage = () => {
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>{new Date(article.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                    <span>{formatDate(article.publishedAt)}</span>
                   </div>
                   <span>•</span>
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>{article.readTime}</span>
+                    <span>{article.readTime} min read</span>
                   </div>
                   <span>•</span>
                   <div className="flex items-center gap-1.5">
@@ -155,17 +361,19 @@ const ArticleDetailPage = () => {
                 </div>
 
                 {/* Author Info */}
-                <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-gray-200">
-                  <img
-                    src={article.author.avatar}
-                    alt={article.author.name}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
-                  />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{article.author.name}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600">{article.author.bio}</p>
+                {article.author && (
+                  <div className="flex items-center gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-gray-200">
+                    <img
+                      src={article.author.image}
+                      alt={article.author.name}
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{article.author.name}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600">{article.author.bio}</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-4 sm:mt-6">
@@ -186,7 +394,7 @@ const ArticleDetailPage = () => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setIsBookmarked(!isBookmarked)}
+                    onClick={handleBookmark}
                     className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm ${
                       isBookmarked
                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
@@ -200,19 +408,11 @@ const ArticleDetailPage = () => {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={() => handleShare('copy')}
                     className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all text-sm"
                   >
                     <Share2 className="w-4 h-4" />
                     <span className="hidden sm:inline">Share</span>
-                  </motion.button>
-
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all text-sm"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="hidden xs:inline">24</span>
                   </motion.button>
                 </div>
               </div>
@@ -224,23 +424,25 @@ const ArticleDetailPage = () => {
               />
 
               {/* Tags */}
-              <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200">
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-                  <span className="text-sm sm:text-base font-semibold text-gray-900">Tags</span>
+              {article.tags.length > 0 && (
+                <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                    <span className="text-sm sm:text-base font-semibold text-gray-900">Tags</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {article.tags.map(({ tag }) => (
+                      <a
+                        key={tag.id}
+                        href={`/articles?tag=${tag.slug}`}
+                        className="px-3 py-1.5 bg-gray-50 text-gray-700 text-xs sm:text-sm rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition-colors border border-gray-200"
+                      >
+                        #{tag.name}
+                      </a>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {article.tags.map((tag, index) => (
-                    <a
-                      key={index}
-                      href={`/articles?tag=${tag}`}
-                      className="px-3 py-1.5 bg-gray-50 text-gray-700 text-xs sm:text-sm rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition-colors border border-gray-200"
-                    >
-                      #{tag}
-                    </a>
-                  ))}
-                </div>
-              </div>
+              )}
             </motion.div>
 
             {/* Comments Section */}
@@ -250,7 +452,7 @@ const ArticleDetailPage = () => {
               transition={{ delay: 0.4 }}
               className="mt-6 sm:mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8"
             >
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Comments (24)</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Comments</h3>
               <div className="mb-6">
                 <textarea
                   placeholder="Share your thoughts..."
@@ -284,20 +486,12 @@ const ArticleDetailPage = () => {
             >
               <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4">Table of Contents</h3>
               <nav className="space-y-2 sm:space-y-3">
+                {/* You can parse the content to generate actual headings */}
                 <a href="#introduction" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
                   Introduction
                 </a>
                 <a href="#spiritual-benefits" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
-                  The Spiritual Benefits of Dhikr
-                </a>
-                <a href="#practical" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
-                  Practical Implementation
-                </a>
-                <a href="#challenges" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
-                  Overcoming Challenges
-                </a>
-                <a href="#transformative" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
-                  The Transformative Power
+                  Key Points
                 </a>
                 <a href="#conclusion" className="block text-sm text-gray-600 hover:text-emerald-600 transition-colors">
                   Conclusion
@@ -317,6 +511,7 @@ const ArticleDetailPage = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => handleShare('facebook')}
                   className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all text-xs sm:text-sm font-medium"
                 >
                   Facebook
@@ -324,6 +519,7 @@ const ArticleDetailPage = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => handleShare('twitter')}
                   className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all text-xs sm:text-sm font-medium"
                 >
                   Twitter
@@ -331,6 +527,7 @@ const ArticleDetailPage = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => handleShare('whatsapp')}
                   className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all text-xs sm:text-sm font-medium"
                 >
                   WhatsApp
@@ -338,6 +535,7 @@ const ArticleDetailPage = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => handleShare('copy')}
                   className="px-3 py-2 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all text-xs sm:text-sm font-medium"
                 >
                   Copy Link
@@ -348,57 +546,61 @@ const ArticleDetailPage = () => {
         </div>
 
         {/* Related Articles */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="mt-12 sm:mt-16 lg:mt-20"
-        >
-          <div className="flex items-center justify-between mb-6 sm:mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Related Articles</h2>
-            <a
-              href="/articles"
-              className="text-sm sm:text-base text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
-            >
-              View All
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {relatedArticles.map((related, index) => (
-              <motion.a
-                key={related.id}
-                href={`/articles/${related.slug}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 + index * 0.1 }}
-                whileHover={{ y: -8 }}
-                className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+        {relatedArticles.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="mt-12 sm:mt-16 lg:mt-20"
+          >
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Related Articles</h2>
+              <a
+                href="/articles"
+                className="text-sm sm:text-base text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
               >
-                <div className="relative h-40 sm:h-48 overflow-hidden">
-                  <img
-                    src={related.image}
-                    alt={related.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute top-3 left-3 px-2 sm:px-3 py-1 bg-white/90 backdrop-blur-sm text-xs sm:text-sm font-semibold text-gray-700 rounded-full">
-                    {related.category}
+                View All
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {relatedArticles.map((related, index) => (
+                <motion.a
+                  key={related.id}
+                  href={`/articles/${related.slug}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 + index * 0.1 }}
+                  whileHover={{ y: -8 }}
+                  className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                >
+                  <div className="relative h-40 sm:h-48 overflow-hidden">
+                    <img
+                      src={related.thumbnail || 'https://images.unsplash.com/photo-1610728488568-88c9f634d4d9?w=400&h=300&fit=crop'}
+                      alt={related.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    {related.tags.length > 0 && (
+                      <div className="absolute top-3 left-3 px-2 sm:px-3 py-1 bg-white/90 backdrop-blur-sm text-xs sm:text-sm font-semibold text-gray-700 rounded-full">
+                        {related.tags[0].tag.name}
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors line-clamp-2">
-                    {related.title}
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
-                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span>{related.readTime}</span>
+                  <div className="p-4 sm:p-5">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 group-hover:text-emerald-600 transition-colors line-clamp-2">
+                      {related.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                      <span>{related.readTime || 5} min read</span>
+                    </div>
                   </div>
-                </div>
-              </motion.a>
-            ))}
-          </div>
-        </motion.section>
+                </motion.a>
+              ))}
+            </div>
+          </motion.section>
+        )}
       </div>
     </div>
   );

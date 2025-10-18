@@ -7,9 +7,10 @@ import { ThemeProvider } from '@/providers/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'LMS Platform',
-  description: 'Learn, Grow, Succeed - Your journey starts here',
+  title: 'Khanqah Saifia',
+  description: 'A center of divine wisdom and spiritual purification through the teachings of Islam.',
 }
+
 
 interface RootLayoutProps {
   children: React.ReactNode

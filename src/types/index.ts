@@ -123,6 +123,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface ArticleWithRelations {
+  [x: string]: ArticleWithRelations
   id: string;
   title: string;
   slug: string;
@@ -357,6 +358,7 @@ export interface BookFilters {
 }
 
 export interface BookWithRelations {
+  [x: string]: BookWithRelations
   id: string
   title: string
   slug: string

@@ -23,8 +23,16 @@ import {
 import { CourseWithRelations } from '@/types'
 import { Enrollment, Module, Lesson, LessonProgress } from '@prisma/client'
 
-interface ModuleWithLessons extends Module {
-  lessons: (Lesson & { progress?: LessonProgress | null })[]
+// Create a custom interface instead of extending Module
+interface ModuleWithLessons {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string | null;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+  lessons: (Lesson & { progress?: LessonProgress | null })[];
 }
 
 interface CourseWithProgress extends CourseWithRelations {
@@ -88,20 +96,42 @@ export default function DashboardCourseDetailPage() {
         // User is not enrolled, which is fine
       }
 
-      // Fetch lesson progress for all lessons
+      // Fetch lesson progress for all lessons with proper type transformation
       const modulesWithProgress = await Promise.all(
         (courseData.modules || []).map(async (module) => {
           const lessonsWithProgress = await Promise.all(
             module.lessons.map(async (lesson) => {
               try {
                 const progress = await apiClient.getLessonProgress(lesson.id)
-                return { ...lesson, progress }
+                return { 
+                  ...lesson, 
+                  progress,
+                  // Ensure description is properly typed
+                  description: lesson.description ?? null
+                }
               } catch {
-                return { ...lesson, progress: null }
+                return { 
+                  ...lesson, 
+                  progress: null,
+                  description: lesson.description ?? null
+                }
               }
             })
           )
-          return { ...module, lessons: lessonsWithProgress }
+          
+          // Create module object that matches ModuleWithLessons interface
+          const moduleWithLessons: ModuleWithLessons = {
+            id: module.id,
+            courseId: module.courseId,
+            title: module.title,
+            description: module.description ?? null, // Ensure description is never undefined
+            order: module.order,
+            createdAt: module.createdAt,
+            updatedAt: module.updatedAt,
+            lessons: lessonsWithProgress
+          }
+          
+          return moduleWithLessons
         })
       )
 
@@ -122,6 +152,8 @@ export default function DashboardCourseDetailPage() {
       setIsLoading(false)
     }
   }
+
+
 
   const toggleModule = (moduleId: string) => {
     const newExpanded = new Set(expandedModules)

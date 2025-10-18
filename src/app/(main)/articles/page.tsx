@@ -67,7 +67,7 @@ const ArticlesPage = () => {
       const response = await apiClient.getPublicArticles({
         page: 1,
         limit: 20,
-        status: 'PUBLISHED'
+        // status: 'PUBLISHED'
       });
 
       debugResponse('Articles', response);
@@ -128,7 +128,7 @@ const ArticlesPage = () => {
       const response = await apiClient.getPublicBooks({
         page: 1,
         limit: 10,
-        status: 'PUBLISHED'
+        // status: 'PUBLISHED'
       });
 
       debugResponse('Ebooks', response);

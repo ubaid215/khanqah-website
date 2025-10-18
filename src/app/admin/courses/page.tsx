@@ -30,26 +30,37 @@ export default function CoursesPage() {
   }, [statusFilter])
 
   const fetchCourses = async () => {
-    try {
-      const response = await apiClient.getCourses({ 
-        status: statusFilter === 'all' ? undefined : statusFilter as CourseStatus
-      })
-      
-      // Fixed: Handle the actual API response structure
-      if (response && Array.isArray(response)) {
-        setCourses(response)
-      } else if (response && response.data) {
-        setCourses(response.data.courses || response.data || [])
+  try {
+    const response = await apiClient.getCourses({ 
+      status: statusFilter === 'all' ? undefined : statusFilter as CourseStatus
+    })
+    
+    // Fixed: Handle the actual API response structure safely
+    if (response && typeof response === 'object' && 'data' in response) {
+      // Handle PaginatedResponse structure
+      const coursesData = response.data;
+      if (Array.isArray(coursesData)) {
+        setCourses(coursesData);
+      } else if (coursesData && Array.isArray(coursesData.courses)) {
+        setCourses(coursesData.courses);
+      } else if (coursesData && Array.isArray(coursesData.data)) {
+        setCourses(coursesData.data);
       } else {
-        setCourses([])
+        setCourses([]);
       }
-    } catch (error) {
-      console.error('Failed to fetch courses:', error)
-      setCourses([])
-    } finally {
-      setIsLoading(false)
+    } else if (Array.isArray(response)) {
+      // Handle direct array response
+      setCourses(response);
+    } else {
+      setCourses([]);
     }
+  } catch (error) {
+    console.error('Failed to fetch courses:', error);
+    setCourses([]);
+  } finally {
+    setIsLoading(false);
   }
+}
 
   const handleAddNewCourse = () => {
     router.push('/admin/courses/create')
@@ -77,9 +88,10 @@ export default function CoursesPage() {
 
   const handlePublishCourse = async (courseId: string) => {
     try {
-      await apiClient.updateCourse(courseId, { 
+      await apiClient.updateCourse(courseId, {
         status: CourseStatus.PUBLISHED,
-        isPublished: true 
+        isPublished: true,
+        categoryIds: undefined
       })
       await fetchCourses() // Refresh the list
     } catch (error: any) {

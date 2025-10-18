@@ -1,4 +1,4 @@
-// src/app/profile/page.tsx
+// src/app/dashboard/profile/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,7 +13,6 @@ import {
   User,
   Mail,
   Calendar,
-  Edit3,
   Save,
   Lock,
   Eye,
@@ -23,7 +22,6 @@ import {
   Loader2,
   BookOpen,
   FileText,
-  Download
 } from 'lucide-react'
 
 interface ProfileFormData {
@@ -38,6 +36,13 @@ interface PasswordFormData {
   currentPassword: string
   newPassword: string
   confirmPassword: string
+}
+
+// Define proper API response types
+interface ApiResponse<T = any> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
 export default function ProfilePage() {
@@ -88,16 +93,22 @@ export default function ProfilePage() {
         username: profileForm.username,
         bio: profileForm.bio,
         image: profileForm.image
-      })
+      }) as ApiResponse
 
-      if (response.success) {
+      if (response.success && response.data) {
         updateUser(response.data)
         setMessage({ type: 'success', text: 'Profile updated successfully!' })
       } else {
-        setMessage({ type: 'error', text: response.error || 'Failed to update profile' })
+        setMessage({ 
+          type: 'error', 
+          text: response.error || 'Failed to update profile' 
+        })
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update profile' })
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to update profile' 
+      })
     } finally {
       setIsUpdating(false)
     }
@@ -125,7 +136,7 @@ export default function ProfilePage() {
       const response = await apiClient.changePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
-      })
+      }) as unknown as ApiResponse
 
       if (response.success) {
         setMessage({ type: 'success', text: 'Password changed successfully!' })
@@ -135,10 +146,16 @@ export default function ProfilePage() {
           confirmPassword: ''
         })
       } else {
-        setMessage({ type: 'error', text: response.error || 'Failed to change password' })
+        setMessage({ 
+          type: 'error', 
+          text: response.error || 'Failed to change password' 
+        })
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to change password' })
+    } catch (error: any) {
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to change password' 
+      })
     } finally {
       setIsChangingPassword(false)
     }
@@ -201,9 +218,9 @@ export default function ProfilePage() {
           <CardContent className="p-6">
             <div className="text-center mb-6">
               <Avatar 
-                src={user.image || ''} 
-                alt={user.name}
-                fallback={getInitials(user.name)}
+                src={user.image || undefined} 
+                alt={user.name || 'User avatar'}
+                fallback={getInitials(user.name || 'User')}
                 className="h-20 w-20 mx-auto mb-3 border-4 border-white shadow-sm bg-blue-600 text-white text-lg"
               />
               <h3 className="font-semibold text-gray-900">{user.name}</h3>

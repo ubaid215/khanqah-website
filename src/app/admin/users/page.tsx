@@ -29,18 +29,22 @@ export default function UsersPage() {
     fetchUsers()
   }, [])
 
-  const fetchUsers = async () => {
-    try {
-      const response = await apiClient.getUsers()
-      if (response.success) {
-        setUsers(response.data?.users || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch users:', error)
-    } finally {
-      setIsLoading(false)
+const fetchUsers = async () => {
+  try {
+    const response = await apiClient.getUsers()
+    if (response.success) {
+      // response.data should be the array of users directly
+      setUsers(Array.isArray(response.data) ? response.data : [])
+    } else {
+      setUsers([])
     }
+  } catch (error) {
+    console.error('Failed to fetch users:', error)
+    setUsers([])
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleUpdateStatus = async (userId: string, status: AccountStatus) => {
     try {

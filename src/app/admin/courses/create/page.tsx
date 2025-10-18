@@ -1,155 +1,208 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/api'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { ArrowLeft, Save, Plus, X, Upload, Loader2 } from 'lucide-react'
-import { CourseLevel, CourseStatus } from '@/types'
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { ArrowLeft, Save, Plus, X, Upload, Loader2 } from "lucide-react";
+import { CourseLevel, CourseStatus } from "@/types";
 
 interface Category {
   id: string;
   name: string;
 }
 
+// Add these type guards at the top of your component, outside the component function
+interface ApiResponseWithSuccess {
+  success: boolean;
+  data: any;
+}
+
+interface ApiResponseWithId {
+  id: string;
+}
+
+function isApiResponseWithSuccess(response: any): response is ApiResponseWithSuccess {
+  return response && typeof response === 'object' && 'success' in response;
+}
+
+function isApiResponseWithId(response: any): response is ApiResponseWithId {
+  return response && typeof response === 'object' && 'id' in response;
+}
+
+function isCategoryArray(response: any): response is Category[] {
+  return Array.isArray(response) && response.every(item => 
+    item && typeof item === 'object' && 'id' in item && 'name' in item
+  );
+}
+
 export default function CreateCoursePage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [categories, setCategories] = useState<string[]>([])
-  const [availableCategories, setAvailableCategories] = useState<Category[]>([])
-  const [newCategory, setNewCategory] = useState('')
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<Category[]>(
+    []
+  );
+  const [newCategory, setNewCategory] = useState("");
   const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    shortDesc: '',
-    thumbnail: '',
+    title: "",
+    slug: "",
+    description: "",
+    shortDesc: "",
+    thumbnail: "",
     level: CourseLevel.BEGINNER,
     price: 0,
     isFree: true,
-  })
+  });
 
   useEffect(() => {
-    fetchAvailableCategories()
-  }, [])
+    fetchAvailableCategories();
+  }, []);
 
   // Fetch all available categories from the system
-  const fetchAvailableCategories = async () => {
-    try {
-      const response = await apiClient.getCategories()
-      if (response.success && response.data) {
-        setAvailableCategories(response.data)
-      } else if (Array.isArray(response)) {
-        setAvailableCategories(response)
+const fetchAvailableCategories = async () => {
+  try {
+    const response = await apiClient.getCategories();
+    
+    if (isCategoryArray(response)) {
+      setAvailableCategories(response);
+    } else if (isApiResponseWithSuccess(response) && Array.isArray(response.data)) {
+      setAvailableCategories(response.data);
+    } else {
+      console.warn('Unexpected response format from getCategories:', response);
+      setAvailableCategories([]);
+    }
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    setAvailableCategories([]);
+  }
+};
+
+ const createNewCategories = async (
+  categoryNames: string[]
+): Promise<string[]> => {
+  const categoryIds: string[] = [];
+
+  for (const categoryName of categoryNames) {
+    const existingCategory = availableCategories.find(
+      (cat) => cat.name.toLowerCase() === categoryName.toLowerCase()
+    );
+
+    if (existingCategory) {
+      categoryIds.push(existingCategory.id);
+    } else {
+      try {
+        // Create new category
+        const response = await apiClient.createCategory({
+          name: categoryName,
+        });
+
+        // Handle different response structures
+        if (response && typeof response === 'object' && 'success' in response && response.success && response.data) {
+          categoryIds.push(response.data.id);
+          setAvailableCategories((prev) => [...prev, response.data]);
+        } else if (response && typeof response === 'object' && 'id' in response) {
+          categoryIds.push(response.id);
+          setAvailableCategories((prev) => [
+            ...prev,
+            { id: response.id, name: categoryName },
+          ]);
+        } else if (Array.isArray(response)) {
+          // If response is an array, take the first item (assuming it's the created category)
+          const newCategory = response[0];
+          if (newCategory && newCategory.id) {
+            categoryIds.push(newCategory.id);
+            setAvailableCategories((prev) => [...prev, newCategory]);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to create category ${categoryName}:`, error);
+        // Continue with other categories even if one fails
       }
-    } catch (error) {
-      console.error('Failed to fetch categories:', error)
     }
   }
 
-  // Create new categories that don't exist and return their IDs
-  const createNewCategories = async (categoryNames: string[]): Promise<string[]> => {
-    const categoryIds: string[] = []
-    
-    for (const categoryName of categoryNames) {
-      const existingCategory = availableCategories.find(
-        cat => cat.name.toLowerCase() === categoryName.toLowerCase()
-      )
-      
-      if (existingCategory) {
-        categoryIds.push(existingCategory.id)
-      } else {
-        try {
-          // Create new category
-          const response = await apiClient.createCategory({
-            name: categoryName,
-            slug: ''
-          })
-          if (response.success && response.data) {
-            categoryIds.push(response.data.id)
-            // Add to available categories
-            setAvailableCategories(prev => [...prev, response.data])
-          } else if (response.id) {
-            categoryIds.push(response.id)
-            setAvailableCategories(prev => [...prev, { id: response.id, name: categoryName }])
-          }
-        } catch (error) {
-          console.error(`Failed to create category ${categoryName}:`, error)
-          // Continue with other categories even if one fails
-        }
-      }
-    }
-    
-    return categoryIds
-  }
+  return categoryIds;
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      // Create categories and get their IDs
-      const categoryIds = await createNewCategories(categories)
-      
-      const courseData = {
-        ...formData,
-        categoryIds, // Send actual category IDs
-        status: CourseStatus.DRAFT
-      }
+  try {
+    // Create categories and get their IDs
+    const categoryIds = await createNewCategories(categories);
 
-      console.log('Creating course with data:', courseData)
+    const courseData = {
+      ...formData,
+      categoryIds,
+      status: CourseStatus.DRAFT,
+    };
 
-      const response = await apiClient.createCourse(courseData)
-      
-      if (response || response?.success) {
-        alert('Course created successfully!')
-        router.push("/admin/courses")
+    console.log("Creating course with data:", courseData);
+
+    const response = await apiClient.createCourse(courseData);
+
+    // Properly check the response structure
+    if (response && typeof response === 'object') {
+      if ('success' in response && response.success) {
+        alert("Course created successfully!");
+        router.push("/admin/courses");
+      } else if ('id' in response) {
+        // Alternative success check if the API returns the created course directly
+        alert("Course created successfully!");
+        router.push("/admin/courses");
       } else {
-        throw new Error("Failed to create course")
+        throw new Error("Failed to create course - invalid response format");
       }
-    } catch (error: any) {
-      console.error("Failed to create course:", error)
-      alert(error.message || "Failed to create course")
-    } finally {
-      setIsLoading(false)
+    } else {
+      throw new Error("Failed to create course - no response");
     }
+  } catch (error: any) {
+    console.error("Failed to create course:", error);
+    alert(error.message || "Failed to create course");
+  } finally {
+    setIsLoading(false);
   }
+};
 
   const handleAddCategory = () => {
     if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()])
-      setNewCategory('')
+      setCategories([...categories, newCategory.trim()]);
+      setNewCategory("");
     }
-  }
+  };
 
   const handleRemoveCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }
+    setCategories(categories.filter((cat) => cat !== categoryToRemove));
+  };
 
   // Add existing category from dropdown
   const handleAddExistingCategory = (categoryName: string) => {
     if (categoryName && !categories.includes(categoryName)) {
-      setCategories([...categories, categoryName])
+      setCategories([...categories, categoryName]);
     }
-  }
+  };
 
   // Helper function to get authentication token
   const getAuthToken = (): string | null => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('token') || 
-             sessionStorage.getItem('token') ||
-             null
+    if (typeof window !== "undefined") {
+      return (
+        localStorage.getItem("token") || sessionStorage.getItem("token") || null
+      );
     }
-    return null
-  }
+    return null;
+  };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
     // Validate file type
     const allowedTypes = [
@@ -158,59 +211,59 @@ export default function CreateCoursePage() {
       "image/png",
       "image/webp",
       "image/gif",
-    ]
+    ];
     if (!allowedTypes.includes(file.type)) {
-      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)")
-      return
+      alert("Please select a valid image file (JPEG, PNG, WebP, or GIF)");
+      return;
     }
 
     // Validate file size (5MB max)
-    const maxSize = 5 * 1024 * 1024
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert("File size must be less than 5MB")
-      return
+      alert("File size must be less than 5MB");
+      return;
     }
 
-    setIsUploading(true)
+    setIsUploading(true);
 
     try {
-      const token = getAuthToken()
+      const token = getAuthToken();
 
       if (!token) {
-        alert("Please log in to upload files")
-        setIsUploading(false)
-        return
+        alert("Please log in to upload files");
+        setIsUploading(false);
+        return;
       }
 
-      const uploadFormData = new FormData()
-      uploadFormData.append("file", file)
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", file);
 
       const response = await fetch("/api/upload", {
         method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: uploadFormData,
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (result.success) {
         setFormData((prev) => ({
           ...prev,
           thumbnail: result.data.url,
-        }))
+        }));
       } else {
-        alert(result.error || "Failed to upload file")
+        alert(result.error || "Failed to upload file");
       }
     } catch (error) {
-      console.error("Upload error:", error)
-      alert("Upload failed. Please try again.")
+      console.error("Upload error:", error);
+      alert("Upload failed. Please try again.");
     } finally {
-      setIsUploading(false)
-      event.target.value = ""
+      setIsUploading(false);
+      event.target.value = "";
     }
-  }
+  };
 
   const generateSlug = (title: string) => {
     return title
@@ -218,16 +271,16 @@ export default function CreateCoursePage() {
       .replace(/[^a-z0-9 -]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
-      .trim()
-  }
+      .trim();
+  };
 
   const handleTitleChange = (title: string) => {
     setFormData((prev) => ({
       ...prev,
       title,
       slug: generateSlug(title),
-    }))
-  }
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -280,7 +333,9 @@ export default function CreateCoursePage() {
                   </label>
                   <Input
                     value={formData.slug}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, slug: e.target.value }))
+                    }
                     placeholder="course-slug"
                     required
                   />
@@ -295,10 +350,12 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.shortDesc}
-                    onChange={(e) => setFormData((prev) => ({
-                      ...prev,
-                      shortDesc: e.target.value,
-                    }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        shortDesc: e.target.value,
+                      }))
+                    }
                     placeholder="Brief description of the course"
                     rows={3}
                   />
@@ -310,10 +367,12 @@ export default function CreateCoursePage() {
                   </label>
                   <Textarea
                     value={formData.description}
-                    onChange={(e) => setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
                     placeholder="Detailed description of the course content"
                     rows={6}
                     required
@@ -338,8 +397,8 @@ export default function CreateCoursePage() {
                     placeholder="Add a new category"
                     onKeyPress={(e) => {
                       if (e.key === "Enter") {
-                        e.preventDefault()
-                        handleAddCategory()
+                        e.preventDefault();
+                        handleAddCategory();
                       }
                     }}
                   />
@@ -361,21 +420,20 @@ export default function CreateCoursePage() {
                     <select
                       onChange={(e) => {
                         if (e.target.value) {
-                          handleAddExistingCategory(e.target.value)
-                          e.target.value = '' // Reset selection
+                          handleAddExistingCategory(e.target.value);
+                          e.target.value = ""; // Reset selection
                         }
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select existing category</option>
                       {availableCategories
-                        .filter(cat => !categories.includes(cat.name))
+                        .filter((cat) => !categories.includes(cat.name))
                         .map((category) => (
                           <option key={category.id} value={category.name}>
                             {category.name}
                           </option>
-                        ))
-                      }
+                        ))}
                     </select>
                   </div>
                 )}
@@ -605,5 +663,5 @@ export default function CreateCoursePage() {
         </div>
       </form>
     </div>
-  )
+  );
 }

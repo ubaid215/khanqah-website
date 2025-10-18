@@ -37,16 +37,16 @@ export default function EditBookPage() {
   const [coverError, setCoverError] = useState('')
   const [fileError, setFileError] = useState('')
 
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    description: '',
-    author: '',
-    coverImage: '',
-    fileUrl: '',
-    pages: 0,
-    status: BookStatus.DRAFT
-  })
+ const [formData, setFormData] = useState({
+  title: '',
+  slug: '',
+  description: '',
+  author: '',
+  coverImage: '',
+  fileUrl: '',
+  pages: 0,
+  status: BookStatus.DRAFT as BookStatus
+})
 
   useEffect(() => {
     fetchBook()

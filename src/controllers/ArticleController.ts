@@ -4,6 +4,7 @@ import { AuthMiddleware } from './AuthController'
 import { ArticleStatus, UserRole } from '@prisma/client'
 
 export class ArticleController {
+  static getArticle: any
   static async createArticle(req: NextRequest) {
     try {
       const authResult = await AuthMiddleware.requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN])(req)
@@ -156,7 +157,7 @@ export class ArticleController {
   }
 
   
-static async getArticles(req: NextRequest) {
+static async getArticles(req: NextRequest, p0?: { params: { id: string } }) {
   try {
     console.log('🔍 [ArticleController] getArticles called');
     

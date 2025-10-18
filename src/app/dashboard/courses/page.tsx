@@ -55,18 +55,35 @@ export default function DashboardCoursesPage() {
   }, [])
 
   const fetchUserCourses = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const enrollmentsData = await apiClient.getUserEnrollments()
-      setEnrollments(enrollmentsData || [])
-    } catch (error: any) {
-      console.error('Failed to fetch user courses:', error)
-      setError(error.message || 'Failed to load your courses')
-    } finally {
-      setIsLoading(false)
-    }
+  try {
+    setIsLoading(true)
+    setError(null)
+    const enrollmentsData = await apiClient.getUserEnrollments()
+    
+    // If the API doesn't return course data, you'll need to fetch it separately
+    const enrollmentsWithCourses = await Promise.all(
+      (enrollmentsData || []).map(async (enrollment) => {
+        try {
+          const course = await apiClient.getCourse(enrollment.courseId)
+          return {
+            ...enrollment,
+            course
+          }
+        } catch (error) {
+          console.error(`Failed to fetch course for enrollment ${enrollment.id}:`, error)
+          return null
+        }
+      })
+    )
+    
+    setEnrollments(enrollmentsWithCourses.filter(Boolean) as EnrollmentWithCourse[])
+  } catch (error: any) {
+    console.error('Failed to fetch user courses:', error)
+    setError(error.message || 'Failed to load your courses')
+  } finally {
+    setIsLoading(false)
   }
+}
 
   const handleCourseClick = (courseSlug: string) => {
     router.push(`/dashboard/courses/${courseSlug}`)

@@ -193,7 +193,7 @@ export default function DashboardPage() {
                     variant="outline" 
                     size="sm" 
                     className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                    asChild
+                   
                   >
                     <Link href={`/dashboard/courses/${course.id}`}>
                       <PlayCircle className="h-4 w-4 mr-1" />

@@ -1,8 +1,8 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, easeOut, easeInOut } from 'framer-motion';
 import HeroSlider from '@/components/shared/HeroSlider';
-import { BookOpen, Users, Heart, Sparkles, ArrowRight, Book, FileText, Star, Mosque, Scale, Gem, Calendar, Building } from 'lucide-react';
+import { BookOpen, Users, Heart, Sparkles, ArrowRight, Book, FileText, Star, Scale, Gem, Calendar, Building } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
@@ -138,26 +138,26 @@ const Homepage = () => {
     }
   };
 
-  const imageVariants = {
-    hidden: { opacity: 0, scale: 0.8, y: 50 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        ease: "easeOut"
-      }
-    },
-    hover: {
-      scale: 1.05,
-      rotate: 2,
-      transition: {
-        duration: 0.3,
-        ease: "easeInOut"
-      }
+ const imageVariants = {
+  hidden: { opacity: 0, scale: 0.8, y: 50 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: easeOut
     }
-  };
+  },
+  hover: {
+    scale: 1.05,
+    rotate: 2,
+    transition: {
+      duration: 0.3,
+      ease: easeInOut
+    }
+  }
+};
 
   // Debug function to log API responses
   const debugResponse = (type: string, response: any) => {
@@ -206,7 +206,7 @@ const Homepage = () => {
       const response = await apiClient.getPublicArticles({
         page: 1,
         limit: 3,
-        status: 'PUBLISHED'
+        // status: 'PUBLISHED'
       });
 
       debugResponse('Articles', response);
@@ -261,7 +261,7 @@ const Homepage = () => {
       const response = await apiClient.getPublicBooks({
         page: 1,
         limit: 4,
-        status: 'PUBLISHED'
+        // status: 'PUBLISHED'
       });
 
       debugResponse('Books', response);

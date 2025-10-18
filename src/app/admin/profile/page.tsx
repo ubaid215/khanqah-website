@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { apiClient } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -19,7 +20,7 @@ import {
 } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { user, updateProfile } = useAuth()
+  const { user } = useAuth() // Only destructure user
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -33,8 +34,11 @@ export default function ProfilePage() {
     setIsLoading(true)
 
     try {
-      await updateProfile(formData)
-      // Profile will be updated via the auth context
+      // Use API client directly for profile updates
+      await apiClient.updateProfile(formData)
+      alert('Profile updated successfully!')
+      // Refresh to get updated user data
+      window.location.reload()
     } catch (error: any) {
       console.error('Failed to update profile:', error)
       alert(error.message || 'Failed to update profile')

@@ -146,7 +146,7 @@ export default function SettingsPage() {
           <Switch
             id="emailNotifications"
             checked={settings.emailNotifications}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, emailNotifications: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, emailNotifications: checked }))}
           />
         </div>
 
@@ -162,7 +162,7 @@ export default function SettingsPage() {
           <Switch
             id="pushNotifications"
             checked={settings.pushNotifications}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, pushNotifications: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, pushNotifications: checked }))}
           />
         </div>
 
@@ -178,7 +178,7 @@ export default function SettingsPage() {
           <Switch
             id="courseUpdates"
             checked={settings.courseUpdates}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, courseUpdates: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, courseUpdates: checked }))}
           />
         </div>
 
@@ -194,7 +194,7 @@ export default function SettingsPage() {
           <Switch
             id="newMessages"
             checked={settings.newMessages}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, newMessages: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, newMessages: checked }))}
           />
         </div>
 
@@ -210,7 +210,7 @@ export default function SettingsPage() {
           <Switch
             id="weeklyDigest"
             checked={settings.weeklyDigest}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, weeklyDigest: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, weeklyDigest: checked }))}
           />
         </div>
       </div>
@@ -232,7 +232,7 @@ export default function SettingsPage() {
           <Switch
             id="twoFactorAuth"
             checked={settings.twoFactorAuth}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, twoFactorAuth: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, twoFactorAuth: checked }))}
           />
         </div>
 
@@ -284,7 +284,7 @@ export default function SettingsPage() {
           <Switch
             id="maintenanceMode"
             checked={settings.maintenanceMode}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, maintenanceMode: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, maintenanceMode: checked }))}
           />
         </div>
 
@@ -300,7 +300,7 @@ export default function SettingsPage() {
           <Switch
             id="userRegistration"
             checked={settings.userRegistration}
-            onCheckedChange={(checked) => setSettings(prev => ({ ...prev, userRegistration: checked }))}
+            onChange={(checked: any) => setSettings(prev => ({ ...prev, userRegistration: checked }))}
           />
         </div>
 

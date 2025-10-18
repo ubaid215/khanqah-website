@@ -64,8 +64,7 @@ const BooksPage = () => {
       
       const response = await apiClient.getPublicBooks({
         page: 1,
-        limit: 100, // Fetch more books to handle filtering
-        status: 'PUBLISHED'
+        limit: 100, 
       });
 
       debugResponse('Books', response);
@@ -451,11 +450,9 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
   const handleBookmark = async () => {
     try {
       await apiClient.createBookmark({
-        resourceId: book.id,
-        type: 'BOOK',
-        title: book.title,
-        description: book.description,
-        image: book.cover
+        bookId: book.id, // Only include properties that exist in CreateBookmarkData
+        type: 'BOOK'
+        // Remove title, description, image as they're not in the type
       });
       // You might want to show a success message here
     } catch (error) {
