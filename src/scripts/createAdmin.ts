@@ -1,5 +1,5 @@
-// scripts/createAdmin.ts
-import { PrismaClient, UserRole } from '@prisma/client'
+// src/scripts/createAdmin.ts
+import { PrismaClient, UserRole, AccountStatus } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -18,21 +18,35 @@ async function createAdmin(options: AdminOptions) {
   } = options
 
   try {
+    console.log('🔍 Validating inputs...')
+    
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       throw new Error('Invalid email format')
     }
 
-    // Validate password strength
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters long')
+    // Validate password strength (production requirements)
+    if (password.length < 8) {
+      throw new Error('Password must be at least 8 characters long')
+    }
+    if (!/[A-Z]/.test(password)) {
+      throw new Error('Password must contain at least one uppercase letter')
+    }
+    if (!/[a-z]/.test(password)) {
+      throw new Error('Password must contain at least one lowercase letter')
+    }
+    if (!/[0-9]/.test(password)) {
+      throw new Error('Password must contain at least one number')
     }
 
-    // Check if user already exists - FIXED: Remove username check
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        email
+    console.log('✓ Input validation passed')
+    console.log('🔍 Checking if user exists...')
+
+    // FIXED: Use findUnique instead of findFirst with proper where clause
+    const existingUser = await prisma.user.findUnique({
+      where: { 
+        email: email.trim()
       }
     })
 
@@ -40,54 +54,96 @@ async function createAdmin(options: AdminOptions) {
       console.log('❌ User with this email already exists')
       console.log(`📧 Email: ${existingUser.email}`)
       console.log(`👤 Role: ${existingUser.role}`)
-      console.log(`👤 Name: ${existingUser.name}`)
+      console.log(`👤 Name: ${existingUser.name || 'N/A'}`)
+      console.log(`📊 Status: ${existingUser.status}`)
+      
+      // Ask if they want to upgrade existing user to admin
+      console.log('')
+      console.log('💡 To upgrade this user to admin role, run:')
+      console.log(`   npx prisma studio`)
+      console.log(`   Or execute SQL: UPDATE users SET role = 'ADMIN' WHERE email = '${email}';`)
       return
     }
 
-    // Hash password
+    console.log('✓ Email is available')
+    console.log('🔐 Hashing password...')
+
+    // Hash password with bcrypt (12 rounds for production)
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    // Create admin user - FIXED: Remove username field
+    console.log('✓ Password hashed')
+    console.log('💾 Creating admin user...')
+
+    // Create admin user
     const admin = await prisma.user.create({
       data: {
-        email,
+        email: email.trim(),
         name,
         password: hashedPassword,
         role: UserRole.ADMIN,
+        status: AccountStatus.ACTIVE,
         emailVerified: new Date(),
-        status: 'ACTIVE' // Add status field if your schema requires it
+        // username is optional in schema, so we don't include it
       }
     })
 
-    console.log('🎉 Admin user created successfully!')
-    console.log(`📧 Email: ${email}`)
-    console.log(`👤 Name: ${name}`)
-    console.log(`🆔 User ID: ${admin.id}`)
-    console.log(`🎯 Role: ${admin.role}`)
-    console.log('✅ Email verified: Yes')
     console.log('')
-    console.log('⚠️  Please keep these credentials secure!')
-    console.log('⚠️  Consider changing the password after first login!')
+    console.log('🎉 ═══════════════════════════════════════════════════')
+    console.log('🎉 Admin User Created Successfully!')
+    console.log('🎉 ═══════════════════════════════════════════════════')
+    console.log('')
+    console.log(`📧 Email:     ${email}`)
+    console.log(`👤 Name:      ${name}`)
+    console.log(`🆔 User ID:   ${admin.id}`)
+    console.log(`🎯 Role:      ${admin.role}`)
+    console.log(`📊 Status:    ${admin.status}`)
+    console.log(`✅ Verified:  ${admin.emailVerified ? 'Yes' : 'No'}`)
+    console.log('')
+    console.log('⚠️  SECURITY REMINDERS:')
+    console.log('   • Store these credentials in a secure password manager')
+    console.log('   • Change password after first login')
+    console.log('   • Enable 2FA if available')
+    console.log('   • Never share admin credentials')
+    console.log('')
+    console.log('🔗 Login at: https://khanqahsaifia.com/admin/login')
+    console.log('')
 
   } catch (error: any) {
-    console.error('❌ Error creating admin user:', error.message)
+    console.error('')
+    console.error('❌ ═══════════════════════════════════════════════════')
+    console.error('❌ Error Creating Admin User')
+    console.error('❌ ═══════════════════════════════════════════════════')
+    console.error('')
+    console.error(`Error: ${error.message}`)
+    console.error('')
     
-    // More detailed error information
-    if (error.message.includes('does not exist in the current database')) {
-      console.log('')
-      console.log('💡 Database Schema Issue Detected:')
-      console.log('It appears your database schema might be out of sync.')
-      console.log('Try running: npx prisma db push')
-      console.log('Or: npx prisma migrate deploy')
+    // Provide helpful debugging information
+    if (error.code === 'P2002') {
+      console.error('💡 This email is already registered in the database')
+    } else if (error.code === 'P2003') {
+      console.error('💡 Database foreign key constraint error')
+    } else if (error.message.includes('does not exist in the current database')) {
+      console.error('💡 Database Schema Issue:')
+      console.error('   Your database schema is out of sync.')
+      console.error('')
+      console.error('   Solutions:')
+      console.error('   1. Run: npx prisma db push')
+      console.error('   2. Or: npx prisma migrate deploy')
+      console.error('   3. Or: npx prisma migrate dev --name init')
+    } else if (error.message.includes('Can\'t reach database server')) {
+      console.error('💡 Database Connection Issue:')
+      console.error('   • Check your DATABASE_URL in .env file')
+      console.error('   • Verify database is running')
+      console.error('   • Check network connectivity')
     }
     
+    console.error('')
     process.exit(1)
   } finally {
     await prisma.$disconnect()
   }
 }
 
-// Get credentials from command line arguments or environment variables
 function getCredentials(): AdminOptions {
   const args = process.argv.slice(2)
   
@@ -95,7 +151,7 @@ function getCredentials(): AdminOptions {
   let password = ''
   let name = 'System Administrator'
 
-  // Parse command line arguments - FIXED: Remove username parsing
+  // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--email' && args[i + 1]) {
       email = args[i + 1]
@@ -115,40 +171,53 @@ function getCredentials(): AdminOptions {
     }
   }
 
-  // Check environment variables if command line args not provided
-  if (!email) {
-    email = process.env.ADMIN_EMAIL || ''
-  }
-  if (!password) {
-    password = process.env.ADMIN_PASSWORD || ''
-  }
+  // Check environment variables
+  if (!email) email = process.env.ADMIN_EMAIL || ''
+  if (!password) password = process.env.ADMIN_PASSWORD || ''
   if (!name || name === 'System Administrator') {
     name = process.env.ADMIN_NAME || 'System Administrator'
   }
 
-  // If still no credentials, use defaults with warning
+  // Production mode: require credentials
   if (!email || !password) {
-    console.log('🔐 No credentials provided. Using defaults (NOT RECOMMENDED FOR PRODUCTION)')
-    console.log('')
-    console.log('Usage examples:')
-    console.log('  npm run create-admin -- --email=your@email.com --password=yourpassword')
-    console.log('  npm run create-admin -- --email your@email.com --password yourpassword')
-    console.log('  ADMIN_EMAIL=your@email.com ADMIN_PASSWORD=yourpassword npm run create-admin')
-    console.log('')
-    
-    if (!email) email = 'admin@lms.com'
-    if (!password) password = 'admin123'
-    
-    console.log(`📧 Using email: ${email}`)
-    console.log(`🔑 Using password: ${password}`)
-    console.log('')
+    console.error('')
+    console.error('❌ ═══════════════════════════════════════════════════')
+    console.error('❌ Admin credentials required!')
+    console.error('❌ ═══════════════════════════════════════════════════')
+    console.error('')
+    console.error('Usage:')
+    console.error('')
+    console.error('  Method 1: Command line arguments')
+    console.error('  npm run create-admin -- --email=admin@example.com --password=SecurePass123')
+    console.error('')
+    console.error('  Method 2: With name')
+    console.error('  npm run create-admin -- --email admin@example.com --password SecurePass123 --name "John Doe"')
+    console.error('')
+    console.error('  Method 3: Environment variables')
+    console.error('  ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=SecurePass123 npm run create-admin')
+    console.error('')
+    console.error('  Method 4: Interactive mode (recommended)')
+    console.error('  npm run create-admin-interactive')
+    console.error('')
+    console.error('Password Requirements:')
+    console.error('  • Minimum 8 characters')
+    console.error('  • At least one uppercase letter')
+    console.error('  • At least one lowercase letter')
+    console.error('  • At least one number')
+    console.error('')
+    process.exit(1)
   }
 
   return { email, password, name }
 }
 
-// Main execution
 async function main() {
+  console.log('')
+  console.log('🚀 ═══════════════════════════════════════════════════')
+  console.log('🚀 Admin User Creation Script')
+  console.log('🚀 ═══════════════════════════════════════════════════')
+  console.log('')
+  
   const credentials = getCredentials()
   await createAdmin(credentials)
 }
