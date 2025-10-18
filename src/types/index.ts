@@ -1,8 +1,75 @@
 // src/types/index.ts
 
+// First, define the missing enums that are causing "Cannot find name" errors
+// These should match your Prisma schema enums
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  INSTRUCTOR = 'INSTRUCTOR',
+  STUDENT = 'STUDENT',
+  USER = 'USER'
+}
+
+export enum AccountStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  PENDING = 'PENDING'
+}
+
+export enum CourseLevel {
+  BEGINNER = 'BEGINNER',
+  INTERMEDIATE = 'INTERMEDIATE',
+  ADVANCED = 'ADVANCED',
+  ALL = 'ALL'
+}
+
+export enum CourseStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED'
+}
+
+export enum LessonType {
+  VIDEO = 'VIDEO',
+  TEXT = 'TEXT',
+  QUIZ = 'QUIZ',
+  ASSIGNMENT = 'ASSIGNMENT'
+}
+
+export enum EnrollmentStatus {
+  ENROLLED = 'ENROLLED',
+  COMPLETED = 'COMPLETED',
+  DROPPED = 'DROPPED'
+}
+
+export enum ArticleStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED'
+}
+
+export enum BookStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED'
+}
+
+export enum QuestionStatus {
+  PENDING = 'PENDING',
+  ANSWERED = 'ANSWERED',
+  RESOLVED = 'RESOLVED',
+  CLOSED = 'CLOSED'
+}
+
+export enum BookmarkType {
+  COURSE = 'COURSE',
+  ARTICLE = 'ARTICLE',
+  BOOK = 'BOOK'
+}
+
 // Core API response types
 export interface ApiResponse<T = any> {
-  status: any
+  status: string
   success: boolean
   data?: T
   error?: string
@@ -11,10 +78,8 @@ export interface ApiResponse<T = any> {
 }
 
 export interface PaginatedResponse<T = any> extends ApiResponse<T> {
-  courses: boolean
-  articles: boolean
-  books: boolean
-  pagination?: {
+  data: T
+  pagination: {
     page: number
     limit: number
     total: number
@@ -36,9 +101,6 @@ export interface RegisterData {
 }
 
 export interface AuthUser {
-  success: any
-  data(data: any): unknown
-  error: string
   id: string
   email: string
   username?: string | null
@@ -111,39 +173,7 @@ export interface CreateCourseData {
   categoryIds?: string[]
 }
 
-// Add to your types definition
-export interface PaginatedResponse<T> {
-  data: T;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-export interface ArticleWithRelations {
-  [x: string]: ArticleWithRelations
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  excerpt?: string;
-  thumbnail?: string;
-  status: ArticleStatus;
-  readTime?: number;
-  views: number;
-  tags?: any[];
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    bookmarks: number;
-  };
-}
-
 export interface UpdateCourseData {
-  categoryIds: any
   title?: string
   description?: string
   shortDesc?: string
@@ -154,6 +184,7 @@ export interface UpdateCourseData {
   isFree?: boolean
   isPublished?: boolean
   publishedAt?: Date | null
+  categoryIds?: string[]
 }
 
 export interface CourseFilters {
@@ -166,14 +197,6 @@ export interface CourseFilters {
 }
 
 export interface CourseWithRelations {
-  categoryNames: any
-  data: CourseWithRelations
-  avgRating: any
-  reviewCount: number
-  studentCount: number
-  instructor: any
-  objectives: boolean
-  requirements: boolean
   id: string
   title: string
   slug: string
@@ -183,13 +206,20 @@ export interface CourseWithRelations {
   level: CourseLevel
   status: CourseStatus
   duration?: number | null
-  price: any // Decimal type from Prisma
+  price: number
   isFree: boolean
   isPublished: boolean
+  categoryNames?: string[]
+  avgRating?: number
+  reviewCount?: number
+  studentCount?: number
+  instructor?: any
+  objectives?: string[]
+  requirements?: string[]
   categories: {
     category: Category
   }[]
-  modules: (ModuleWithLessons)[]
+  modules: ModuleWithLessons[]
   _count?: {
     enrollments: number
     modules: number
@@ -226,6 +256,21 @@ export interface ModuleWithLessons {
 }
 
 // Lesson types
+export interface Lesson {
+  id: string
+  moduleId: string
+  title: string
+  description?: string | null
+  type: LessonType
+  content?: string | null
+  videoUrl?: string | null
+  duration?: number | null
+  order: number
+  isFree: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface CreateLessonData {
   moduleId: string
   title: string
@@ -307,8 +352,6 @@ export interface ArticleFilters {
 }
 
 export interface ArticleWithRelations {
-  success: ArticleWithRelations
-  error: string
   id: string
   title: string
   slug: string
@@ -358,7 +401,6 @@ export interface BookFilters {
 }
 
 export interface BookWithRelations {
-  [x: string]: BookWithRelations
   id: string
   title: string
   slug: string
@@ -401,8 +443,6 @@ export interface QuestionFilters {
 }
 
 export interface QuestionWithRelations {
-  success: any
-  data: any
   id: string
   userId: string
   title: string
@@ -456,6 +496,7 @@ export interface BookmarkWithRelations {
   courseId?: string | null
   article?: ArticleWithRelations | null
   book?: BookWithRelations | null
+  course?: CourseWithRelations | null
   createdAt: Date
 }
 
@@ -532,7 +573,7 @@ export interface UserStats {
   completedCourses: number
   totalProgress: number
   certificates: Certificate[]
-  recentActivity: any[] // Define based on your activity tracking
+  recentActivity: any[]
 }
 
 // File upload types
@@ -553,40 +594,24 @@ export interface FormErrors {
   [key: string]: string
 }
 
-// Prisma enums (re-export for convenience)
-export {
-  UserRole,
-  AccountStatus,
-  CourseLevel,
-  CourseStatus,
-  LessonType,
-  EnrollmentStatus,
-  ArticleStatus,
-  BookStatus,
-  QuestionStatus,
-  BookmarkType
-} from '@prisma/client'
-
 // Utility types for API responses
-export type ApiSuccess<T = any> = {
+export type ApiSuccess<T = any> = ApiResponse<T> & {
   success: true
   data: T
-  message?: string
 }
 
-export type ApiError = {
+export type ApiError = ApiResponse & {
   success: false
   error: string
-  errors?: Record<string, string>
 }
 
 // Type guards
 export const isApiSuccess = <T>(response: ApiResponse<T>): response is ApiSuccess<T> => {
-  return response.success === true
+  return response.success === true && response.status === 'success'
 }
 
 export const isApiError = (response: ApiResponse): response is ApiError => {
-  return response.success === false
+  return response.success === false && response.status === 'error'
 }
 
 // Pagination utility types
@@ -647,21 +672,23 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'auto'
 }
 
-// Export all types for easy importing
+// Re-export Prisma types if needed
+// Note: Remove this section if you're having import issues with @prisma/client
 export type {
-  User as PrismaUser,
-  Session as PrismaSession,
-  Course as PrismaCourse,
-  Module as PrismaModule,
-  Lesson as PrismaLesson,
-  Enrollment as PrismaEnrollment,
-  LessonProgress as PrismaLessonProgress,
-  Certificate as PrismaCertificate,
-  Category as PrismaCategory,
-  Article as PrismaArticle,
-  Tag as PrismaTag,
-  Book as PrismaBook,
-  Question as PrismaQuestion,
-  Answer as PrismaAnswer,
-  Bookmark as PrismaBookmark
+  // These are commented out to avoid import issues
+  // User as PrismaUser,
+  // Session as PrismaSession,
+  // Course as PrismaCourse,
+  // Module as PrismaModule,
+  // Lesson as PrismaLesson,
+  // Enrollment as PrismaEnrollment,
+  // LessonProgress as PrismaLessonProgress,
+  // Certificate as PrismaCertificate,
+  // Category as PrismaCategory,
+  // Article as PrismaArticle,
+  // Tag as PrismaTag,
+  // Book as PrismaBook,
+  // Question as PrismaQuestion,
+  // Answer as PrismaAnswer,
+  // Bookmark as PrismaBookmark
 } from '@prisma/client'

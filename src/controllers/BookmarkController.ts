@@ -99,7 +99,10 @@ export class BookmarkController {
       }
 
       const { searchParams } = new URL(req.url)
-      const type = searchParams.get('type') as BookmarkType | null
+      const typeParam = searchParams.get('type')
+      
+      // Convert null to undefined to match the expected type
+      const type = typeParam as BookmarkType | undefined
 
       const bookmarks = await BookmarkModel.getUserBookmarks(authResult.user!.id, type)
 

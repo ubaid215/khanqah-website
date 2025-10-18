@@ -102,9 +102,14 @@ export class ApiClient {
       const response = await fetch(url, config)
       
       // Handle empty responses (like 204 No Content)
-      if (response.status === 204) {
-        return { success: true, data: null as any }
+       if (response.status === 204) {
+      return { 
+        status: 'success', // Add this line
+        success: true, 
+        data: null as any 
       }
+    }
+
 
       const data = await response.json()
 
@@ -663,7 +668,7 @@ async createArticle(articleData: CreateArticleData): Promise<any> {
     
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
+        if (value !== undefined && value !== null) {
           params.append(key, String(value))
         }
       })

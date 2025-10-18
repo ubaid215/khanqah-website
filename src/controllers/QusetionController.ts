@@ -122,10 +122,14 @@ export class QuestionController {
   static async getQuestions(req: NextRequest) {
     try {
       const { searchParams } = new URL(req.url)
-      const status = searchParams.get('status') as QuestionStatus | null
-      const userId = searchParams.get('userId')
+      const statusParam = searchParams.get('status')
+      const userIdParam = searchParams.get('userId')
       const page = parseInt(searchParams.get('page') || '1')
       const limit = parseInt(searchParams.get('limit') || '10')
+
+      // Convert null to undefined to match the expected types
+      const status = statusParam as QuestionStatus | undefined
+      const userId = userIdParam || undefined
 
       const result = await QuestionModel.getQuestions({
         status,

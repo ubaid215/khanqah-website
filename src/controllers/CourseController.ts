@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CourseModel } from '@/models/Course'
 import { AuthMiddleware, ApiResponse } from '@/controllers/AuthController'
-import { CourseLevel, CourseStatus, UserRole } from '@prisma/client'
+import { CourseLevel, CourseStatus } from '@prisma/client'
+
+// Define UserRole locally to avoid import conflicts
+enum UserRole {
+  USER = 'USER',
+  ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN'
+}
 
 export class CourseController {
   static async createCourse(req: NextRequest) {
@@ -112,10 +119,9 @@ export class CourseController {
       const authResult = await AuthMiddleware.verifyAuth(req);
       console.log("👤 Auth result:", authResult?.user ? `User: ${authResult.user.email}` : "No user");
 
-      // 🔹 Check admin privileges
-      const isAdmin =
-        authResult.user &&
-        [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role);
+      // 🔹 Check admin privileges using string comparison to avoid type issues
+      const isAdmin = authResult.user && 
+        (authResult.user.role === 'ADMIN' || authResult.user.role === 'SUPER_ADMIN');
       console.log("🛡️ Is Admin:", isAdmin);
 
       // 🔹 Restrict unpublished courses for non-admin users

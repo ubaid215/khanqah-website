@@ -1,6 +1,7 @@
 // src/components/user/Header.tsx
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { 
   Bell, 
@@ -8,12 +9,12 @@ import {
   User, 
   Settings, 
   LogOut,
-  Menu
+  Menu,
+  ChevronDown
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Avatar } from '@/components/ui/Avatar'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 
 interface HeaderProps {
   onToggleSidebar: () => void
@@ -21,6 +22,7 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar }: HeaderProps) {
   const { user, logout } = useAuth()
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -58,39 +60,61 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
           </Button>
 
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <Avatar
-                  src={user?.image || undefined}
-                  fallback={user?.name || user?.email || 'U'}
-                  className="h-8 w-8"
-                />
-                <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user?.name || user?.email}
-                  </p>
-                  <p className="text-xs text-gray-500">Student</p>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem>
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </DropdownMenuItem>
-              <div className="border-t border-gray-200 my-1"></div>
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* User Menu - Simple version without problematic DropdownMenu */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center space-x-3 p-2"
+            >
+              <Avatar
+                src={user?.image || undefined}
+                fallback={
+                  user?.name 
+                    ? user.name.charAt(0).toUpperCase() 
+                    : user?.email 
+                    ? user.email.charAt(0).toUpperCase() 
+                    : 'U'
+                }
+                className="h-8 w-8"
+              />
+              <div className="hidden sm:block text-left">
+                <p className="text-sm font-medium text-gray-900">
+                  {user?.name || user?.email}
+                </p>
+                <p className="text-xs text-gray-500">Student</p>
+              </div>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+
+            {/* Custom Dropdown Menu */}
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <button
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
+                </button>
+                <button
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </button>
+                <div className="border-t border-gray-200 my-1"></div>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -2,7 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BookModel } from '@/models/Book'
 import { AuthMiddleware } from './AuthController'
-import { BookStatus, UserRole } from '@prisma/client'
+import { BookStatus } from '@prisma/client'
+
+// Define UserRole locally to avoid import conflicts
+enum UserRole {
+  USER = 'USER',
+  ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN'
+}
 
 export class BookController {
   static async createBook(req: NextRequest) {
@@ -97,8 +104,10 @@ export class BookController {
 
       // Only show published books to non-admins
       const authResult = await AuthMiddleware.verifyAuth(req)
+      
+      // Use string comparison to avoid type issues
       const isAdmin = authResult.user && 
-        [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(authResult.user.role)
+        (authResult.user.role === 'ADMIN' || authResult.user.role === 'SUPER_ADMIN')
 
       if (book.status !== BookStatus.PUBLISHED && !isAdmin) {
         return NextResponse.json(
@@ -249,62 +258,62 @@ export class BookController {
   }
 
   static async downloadBook(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const book = await BookModel.findById(params.id)
-    if (!book) {
+    try {
+      const book = await BookModel.findById(params.id)
+      if (!book) {
+        return NextResponse.json(
+          { success: false, error: 'Book not found' },
+          { status: 404 }
+        )
+      }
+
+      if (book.status !== BookStatus.PUBLISHED) {
+        return NextResponse.json(
+          { success: false, error: 'Book not available for download' },
+          { status: 400 }
+        )
+      }
+
+      if (!book.fileUrl) {
+        return NextResponse.json(
+          { success: false, error: 'Book file not available' },
+          { status: 400 }
+        )
+      }
+
+      // Get the file from your storage (adjust based on your storage solution)
+      const response = await fetch(book.fileUrl)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch file')
+      }
+
+      // Get the file as blob
+      const fileBlob = await response.blob()
+      
+      // Get filename from URL or use book title
+      const filename = book.fileUrl.split('/').pop() || `${book.slug}.pdf`
+      const safeFilename = encodeURIComponent(filename)
+
+      // Increment download count for analytics
+      await BookModel.incrementDownloads(params.id)
+
+      // Return the file as a download
+      return new NextResponse(fileBlob, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${safeFilename}"`,
+          'Content-Length': fileBlob.size.toString(),
+          'Cache-Control': 'no-cache',
+        },
+      })
+    } catch (error) {
+      console.error('Download book error:', error)
       return NextResponse.json(
-        { success: false, error: 'Book not found' },
-        { status: 404 }
+        { success: false, error: 'Internal server error' },
+        { status: 500 }
       )
     }
-
-    if (book.status !== BookStatus.PUBLISHED) {
-      return NextResponse.json(
-        { success: false, error: 'Book not available for download' },
-        { status: 400 }
-      )
-    }
-
-    if (!book.fileUrl) {
-      return NextResponse.json(
-        { success: false, error: 'Book file not available' },
-        { status: 400 }
-      )
-    }
-
-    // Get the file from your storage (adjust based on your storage solution)
-    const response = await fetch(book.fileUrl)
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch file')
-    }
-
-    // Get the file as blob
-    const fileBlob = await response.blob()
-    
-    // Get filename from URL or use book title
-    const filename = book.fileUrl.split('/').pop() || `${book.slug}.pdf`
-    const safeFilename = encodeURIComponent(filename)
-
-    // Increment download count for analytics
-    await BookModel.incrementDownloads(params.id)
-
-    // Return the file as a download
-    return new NextResponse(fileBlob, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${safeFilename}"`,
-        'Content-Length': fileBlob.size.toString(),
-        'Cache-Control': 'no-cache',
-      },
-    })
-  } catch (error) {
-    console.error('Download book error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    )
   }
-}
 }
