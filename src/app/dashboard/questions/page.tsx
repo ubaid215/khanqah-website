@@ -56,6 +56,17 @@ interface Question {
   }
 }
 
+// Define the expected API response type
+interface QuestionsResponse {
+  success: boolean
+  data?: Question[] | {
+    questions?: Question[]
+    items?: Question[]
+    data?: Question[]
+  }
+  error?: string
+}
+
 export default function MyQuestionsPage() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<Question[]>([])
@@ -74,9 +85,21 @@ export default function MyQuestionsPage() {
 
   const fetchMyQuestions = async () => {
     try {
-      const response = await apiClient.getQuestions({ userId: user?.id })
+      const response = await apiClient.getQuestions({ userId: user?.id }) as QuestionsResponse
+      
       if (response.success) {
-        setQuestions(response.data?.questions || [])
+        // Handle different possible response structures
+        let questionsData: Question[] = []
+        
+        if (Array.isArray(response.data)) {
+          // If data is directly the array
+          questionsData = response.data
+        } else if (response.data && typeof response.data === 'object') {
+          // If data is an object with nested properties
+          questionsData = (response.data.questions || response.data.items || response.data.data || []) as Question[]
+        }
+        
+        setQuestions(questionsData)
       }
     } catch (error) {
       console.error('Failed to fetch questions:', error)
@@ -250,15 +273,24 @@ export default function MyQuestionsPage() {
         <Card className="bg-blue-50 border-blue-100">
           <CardContent className="p-12 text-center">
             <MessageSquare className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No questions yet</h3>
-            <p className="text-gray-600 mb-4">Start by asking your first question to get help from the community</p>
-            <Button 
-              onClick={() => window.location.href = '/ask-question'}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Ask Your First Question
-            </Button>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {questions.length === 0 ? 'No questions yet' : 'No questions match your filters'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {questions.length === 0 
+                ? 'Start by asking your first question to get help from the community'
+                : 'Try adjusting your search terms or filters'
+              }
+            </p>
+            {questions.length === 0 && (
+              <Button 
+                onClick={() => window.location.href = '/ask-question'}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Ask Your First Question
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -282,7 +314,7 @@ export default function MyQuestionsPage() {
                       </div>
                       <div className="flex items-center text-sm text-gray-500">
                         <MessageSquare className="h-4 w-4 mr-1" />
-                        {question._count.answers} answers
+                        {question._count?.answers || 0} answers
                       </div>
                     </div>
                     
@@ -355,17 +387,17 @@ export default function MyQuestionsPage() {
                 </div>
 
                 {/* Answers Section */}
-                {question._count.answers > 0 && (
+                {(question._count?.answers || 0) > 0 && (
                   <div className="border-t border-gray-200 pt-4">
                     <button
                       onClick={() => toggleQuestion(question.id)}
                       className="flex items-center justify-between w-full text-left"
                     >
                       <h4 className="font-semibold text-gray-900">
-                        Answers ({question._count.answers})
+                        Answers ({question._count?.answers || 0})
                       </h4>
                       <div className="flex items-center space-x-2">
-                        {question.answers.some(answer => answer.isAccepted) && (
+                        {question.answers?.some(answer => answer.isAccepted) && (
                           <Badge className="bg-green-100 text-green-800 border-green-200">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Solved
@@ -376,7 +408,7 @@ export default function MyQuestionsPage() {
 
                     {expandedQuestions.has(question.id) && (
                       <div className="mt-4 space-y-4">
-                        {question.answers.map((answer) => (
+                        {question.answers?.map((answer) => (
                           <div
                             key={answer.id}
                             className={`p-4 rounded-lg border ${
@@ -429,7 +461,7 @@ export default function MyQuestionsPage() {
                                 </span>
                                 <div className="flex items-center">
                                   <ThumbsUp className="h-4 w-4 mr-1" />
-                                  {answer._count.votes} votes
+                                  {answer._count?.votes || 0} votes
                                 </div>
                               </div>
                             </div>
@@ -468,7 +500,7 @@ export default function MyQuestionsPage() {
               </div>
               <div>
                 <div className="text-2xl font-bold text-blue-600">
-                  {questions.reduce((total, q) => total + q._count.answers, 0)}
+                  {questions.reduce((total, q) => total + (q._count?.answers || 0), 0)}
                 </div>
                 <div className="text-sm text-gray-600">Total Answers</div>
               </div>
