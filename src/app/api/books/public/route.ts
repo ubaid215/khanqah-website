@@ -1,6 +1,7 @@
 // src/app/api/books/public/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { BookController } from '@/controllers/BookController'
+export const dynamic = 'force-dynamic'
 
 // GET /api/books/public - Get published books (public)
 export async function GET(req: NextRequest) {

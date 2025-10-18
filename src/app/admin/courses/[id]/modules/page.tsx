@@ -322,6 +322,7 @@ export default function CourseModulesPage() {
       type: lesson.type,
       content: lesson.content || '',
       videoUrl: lesson.videoUrl || '',
+      // FIXED: Handle null duration by providing default value
       duration: lesson.duration || 0,
       order: lesson.order,
       isFree: lesson.isFree || false
@@ -461,12 +462,14 @@ export default function CourseModulesPage() {
     }
   }
 
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) {
-      return `${minutes} min`
+  // FIXED: Handle null duration by providing default value
+  const formatDuration = (minutes: number | null) => {
+    const duration = minutes || 0
+    if (duration < 60) {
+      return `${duration} min`
     }
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
+    const hours = Math.floor(duration / 60)
+    const mins = duration % 60
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
   }
 
@@ -896,7 +899,8 @@ export default function CourseModulesPage() {
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                               <span className="capitalize">{getLessonTypeLabel(lesson.type)}</span>
-                              {lesson.duration > 0 && (
+                              {/* FIXED: Handle null duration */}
+                              {lesson.duration && lesson.duration > 0 && (
                                 <span>{formatDuration(lesson.duration)}</span>
                               )}
                               <span>Order: {lesson.order}</span>

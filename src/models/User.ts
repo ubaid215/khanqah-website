@@ -50,12 +50,20 @@ export class UserModel {
 
     const hashedPassword = await bcrypt.hash(data.password, this.SALT_ROUNDS)
     
+    // Fix: Only include role if explicitly provided, let database default handle it
+    const userData: any = {
+      ...data,
+      password: hashedPassword,
+    }
+
+    // Only include role if it's explicitly provided
+    if (data.role) {
+      userData.role = data.role
+    }
+    // Otherwise, let the database use the default value (UserRole.USER)
+    
     return await prisma.user.create({
-      data: {
-        ...data,
-        password: hashedPassword,
-        role: data.role || UserRole.USER,
-      },
+      data: userData,
       select: this.getSafeUserSelect()
     })
   }

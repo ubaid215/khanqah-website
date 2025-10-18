@@ -1,5 +1,20 @@
 // src/types/index.ts
 
+// Import Prisma enums and types first
+import {
+  UserRole,
+  AccountStatus,
+  CourseLevel,
+  CourseStatus,
+  LessonType,
+  EnrollmentStatus,
+  ArticleStatus,
+  BookStatus,
+  QuestionStatus,
+  BookmarkType,
+  Lesson // Add Lesson import
+} from '@prisma/client'
+
 // Core API response types
 export interface ApiResponse<T = any> {
   status?: string // Make status optional
@@ -11,10 +26,11 @@ export interface ApiResponse<T = any> {
 }
 
 export interface PaginatedResponse<T = any> extends ApiResponse<T> {
-  courses: boolean
-  articles: boolean
-  books: boolean
-  pagination?: {
+  courses(courses: any): unknown
+  articles?: boolean
+  books?: boolean
+  data: T
+  pagination: {
     page: number
     limit: number
     total: number
@@ -111,37 +127,6 @@ export interface CreateCourseData {
   categoryIds?: string[]
 }
 
-// Add to your types definition
-export interface PaginatedResponse<T> {
-  data: T;
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-export interface ArticleWithRelations {
-  [x: string]: ArticleWithRelations
-  id: string;
-  title: string;
-  slug: string;
-  content: string;
-  excerpt?: string;
-  thumbnail?: string;
-  status: ArticleStatus;
-  readTime?: number;
-  views: number;
-  tags?: any[];
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    bookmarks: number;
-  };
-}
-
 export interface UpdateCourseData {
   categoryIds: any
   title?: string
@@ -220,7 +205,7 @@ export interface ModuleWithLessons {
   title: string
   description?: string | null
   order: number
-  lessons: Lesson[]
+  lessons: Lesson[] // Now Lesson is imported
   createdAt: Date
   updatedAt: Date
 }
@@ -306,9 +291,9 @@ export interface ArticleFilters {
   limit?: number
 }
 
+// Fix: Remove the problematic index signature and merge duplicate ArticleWithRelations
 export interface ArticleWithRelations {
-  success: ArticleWithRelations
-  error: string
+  success: any
   id: string
   title: string
   slug: string
@@ -357,8 +342,9 @@ export interface BookFilters {
   limit?: number
 }
 
+// Fix: Remove the problematic index signature from BookWithRelations
 export interface BookWithRelations {
-  [x: string]: BookWithRelations
+  success: any
   id: string
   title: string
   slug: string
@@ -553,20 +539,6 @@ export interface FormErrors {
   [key: string]: string
 }
 
-// Prisma enums (re-export for convenience)
-export {
-  UserRole,
-  AccountStatus,
-  CourseLevel,
-  CourseStatus,
-  LessonType,
-  EnrollmentStatus,
-  ArticleStatus,
-  BookStatus,
-  QuestionStatus,
-  BookmarkType
-} from '@prisma/client'
-
 // Utility types for API responses
 export type ApiSuccess<T = any> = {
   success: true
@@ -647,7 +619,7 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'auto'
 }
 
-// Export all types for easy importing
+// Export all types for easy importing - FIXED: Use export type for type-only re-exports
 export type {
   User as PrismaUser,
   Session as PrismaSession,
@@ -665,3 +637,19 @@ export type {
   Answer as PrismaAnswer,
   Bookmark as PrismaBookmark
 } from '@prisma/client'
+
+// Re-export Prisma enums for convenience - FIXED: Use export type for Lesson since it's a type
+export {
+  UserRole,
+  AccountStatus,
+  CourseLevel,
+  CourseStatus,
+  LessonType,
+  EnrollmentStatus,
+  ArticleStatus,
+  BookStatus,
+  QuestionStatus,
+  BookmarkType
+} from '@prisma/client'
+
+export type { Lesson } from '@prisma/client'

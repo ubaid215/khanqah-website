@@ -1,6 +1,7 @@
 // src/app/api/dashboard/stats/route.ts
 import { NextRequest } from 'next/server'
 import { requireAdmin } from '@/middleware/auth'
+export const dynamic = 'force-dynamic'
 
 export const GET = requireAdmin(async (req: NextRequest) => {
   // Placeholder - implement dashboard stats

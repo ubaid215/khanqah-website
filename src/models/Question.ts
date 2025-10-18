@@ -14,7 +14,29 @@ export interface CreateAnswerData {
   content: string
 }
 
+// Fix: Update the type to match Prisma schema (nullable fields)
 export type QuestionWithRelations = Question & {
+  user: {
+    id: string
+    name: string | null
+    image: string | null
+    username: string | null
+  }
+  answers: (Answer & {
+    user: {
+      id: string
+      name: string | null
+      image: string | null
+      username: string | null
+    }
+  })[]
+  _count?: {
+    answers: number
+  }
+}
+
+// Optional: Create a safe version with default values
+export type SafeQuestionWithRelations = Question & {
   user: {
     id: string
     name: string
@@ -31,11 +53,31 @@ export type QuestionWithRelations = Question & {
   })[]
   _count?: {
     answers: number
-    views: number
   }
 }
 
 export class QuestionModel {
+  // Helper method to handle null values safely
+  private static safeUser(user: { id: string; name: string | null; image: string | null; username: string | null }) {
+    return {
+      id: user.id,
+      name: user.name || 'Anonymous',
+      image: user.image || '/images/avatar-placeholder.png',
+      username: user.username || 'user'
+    }
+  }
+
+  private static makeQuestionSafe(question: QuestionWithRelations): SafeQuestionWithRelations {
+    return {
+      ...question,
+      user: this.safeUser(question.user),
+      answers: question.answers.map(answer => ({
+        ...answer,
+        user: this.safeUser(answer.user)
+      }))
+    }
+  }
+
   // Question methods
   static async create(data: CreateQuestionData): Promise<QuestionWithRelations> {
     return await prisma.question.create({
@@ -71,6 +113,12 @@ export class QuestionModel {
     })
   }
 
+  // Safe version with default values
+  static async createSafe(data: CreateQuestionData): Promise<SafeQuestionWithRelations> {
+    const question = await this.create(data)
+    return this.makeQuestionSafe(question)
+  }
+
   static async findById(id: string): Promise<QuestionWithRelations | null> {
     return await prisma.question.findUnique({
       where: { id },
@@ -103,6 +151,12 @@ export class QuestionModel {
         }
       }
     })
+  }
+
+  // Safe version with default values
+  static async findByIdSafe(id: string): Promise<SafeQuestionWithRelations | null> {
+    const question = await this.findById(id)
+    return question ? this.makeQuestionSafe(question) : null
   }
 
   static async updateQuestion(id: string, data: {
@@ -142,6 +196,16 @@ export class QuestionModel {
         }
       }
     })
+  }
+
+  // Safe version with default values
+  static async updateQuestionSafe(id: string, data: {
+    title?: string
+    content?: string
+    status?: QuestionStatus
+  }): Promise<SafeQuestionWithRelations> {
+    const question = await this.updateQuestion(id, data)
+    return this.makeQuestionSafe(question)
   }
 
   static async deleteQuestion(id: string): Promise<Question> {
@@ -210,8 +274,36 @@ export class QuestionModel {
     }
   }
 
+  // Safe version for getQuestions
+  static async getQuestionsSafe(options?: {
+    status?: QuestionStatus
+    userId?: string
+    page?: number
+    limit?: number
+  }) {
+    const result = await this.getQuestions(options)
+    
+    const safeQuestions = result.questions.map(question => ({
+      ...question,
+      user: this.safeUser(question.user)
+    }))
+
+    return {
+      questions: safeQuestions,
+      pagination: result.pagination
+    }
+  }
+
   // Answer methods
-  static async createAnswer(data: CreateAnswerData): Promise<Answer> {
+  static async createAnswer(data: CreateAnswerData): Promise<Answer & {
+    user: {
+      id: string
+      name: string | null
+      image: string | null
+      username: string | null
+    }
+    question: Question
+  }> {
     return await prisma.answer.create({
       data,
       include: {
@@ -228,7 +320,31 @@ export class QuestionModel {
     })
   }
 
-  static async acceptAnswer(answerId: string): Promise<Answer> {
+  // Safe version for createAnswer
+  static async createAnswerSafe(data: CreateAnswerData): Promise<Answer & {
+    user: {
+      id: string
+      name: string
+      image: string
+      username: string
+    }
+    question: Question
+  }> {
+    const answer = await this.createAnswer(data)
+    return {
+      ...answer,
+      user: this.safeUser(answer.user)
+    }
+  }
+
+  static async acceptAnswer(answerId: string): Promise<Answer & {
+    user: {
+      id: string
+      name: string | null
+      image: string | null
+      username: string | null
+    }
+  }> {
     const answer = await prisma.answer.findUnique({
       where: { id: answerId },
       include: { question: true }
@@ -262,6 +378,22 @@ export class QuestionModel {
         }
       }
     })
+  }
+
+  // Safe version for acceptAnswer
+  static async acceptAnswerSafe(answerId: string): Promise<Answer & {
+    user: {
+      id: string
+      name: string
+      image: string
+      username: string
+    }
+  }> {
+    const answer = await this.acceptAnswer(answerId)
+    return {
+      ...answer,
+      user: this.safeUser(answer.user)
+    }
   }
 
   static async deleteAnswer(id: string): Promise<Answer> {

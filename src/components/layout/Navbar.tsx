@@ -7,6 +7,7 @@ import { Search, Menu, X, ChevronDown, User, LogOut, LayoutDashboard } from 'luc
 import { motion, AnimatePresence } from 'framer-motion';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/providers/AuthProvider';
+import { UserRole } from '@/types'; // Import UserRole enum
 
 // -------------------- TYPES --------------------
 type SubLink = {
@@ -79,20 +80,20 @@ const Navbar: React.FC = () => {
     { name: 'Books', href: '/books' },
   ];
 
-  // Handle dashboard navigation based on user role
+  // Handle dashboard navigation based on user role - FIXED: Use UserRole enum
   const handleDashboardClick = () => {
     setShowUserMenu(false);
-    if (user?.role === 'admin') {
+    if (user?.role === UserRole.ADMIN) { // Use enum value instead of string literal
       router.push('/admin');
     } else {
       router.push('/dashboard');
     }
   };
 
-  // Handle profile navigation based on user role
+  // Handle profile navigation based on user role - FIXED: Use UserRole enum
   const handleProfileClick = () => {
     setShowUserMenu(false);
-    if (user?.role === 'admin') {
+    if (user?.role === UserRole.ADMIN) { // Use enum value instead of string literal
       router.push('/admin/profile');
     } else {
       router.push('/dashboard/profile');
@@ -213,7 +214,8 @@ const Navbar: React.FC = () => {
                       <div className="px-4 py-3 border-b border-gray-100">
                         <p className="text-sm font-semibold text-gray-900 truncate">{user.name || 'User'}</p>
                         <p className="text-xs text-gray-500 truncate mt-0.5">{user.email}</p>
-                        {user.role === 'admin' && (
+                        {/* FIXED: Use UserRole enum for comparison */}
+                        {user.role === UserRole.ADMIN && (
                           <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
                             Admin
                           </span>
@@ -289,7 +291,8 @@ const Navbar: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 truncate">{user.name || 'User'}</p>
                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      {user.role === 'admin' && (
+                      {/* FIXED: Use UserRole enum for comparison */}
+                      {user.role === UserRole.ADMIN && (
                         <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
                           Admin
                         </span>

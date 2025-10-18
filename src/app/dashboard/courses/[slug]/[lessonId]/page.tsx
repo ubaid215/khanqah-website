@@ -20,11 +20,12 @@ import {
 interface LessonWithProgress {
   id: string
   title: string
-  description?: string
+  description?: string | null // FIXED: Allow null
   type: string
-  content?: string
-  videoUrl?: string
-  duration?: number
+  content?: string | null // FIXED: Allow null
+  videoUrl?: string | null // FIXED: Allow null
+  duration?: number | null // FIXED: Allow null
+  order: number
   isFree: boolean
   progress?: {
     isCompleted: boolean
@@ -149,7 +150,8 @@ export default function DashboardLessonPage() {
     router.push(`/dashboard/courses/${slug}/${targetLesson.id}`)
   }
 
-  const formatDuration = (duration?: number) => {
+  // FIXED: Handle null duration
+  const formatDuration = (duration?: number | null) => {
     if (!duration) return 'N/A'
     const hours = Math.floor(duration / 60)
     const minutes = duration % 60

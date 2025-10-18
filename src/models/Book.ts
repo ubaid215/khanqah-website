@@ -378,12 +378,9 @@ export class BookModel {
             }
           }
         },
-        orderBy: {
-          _relevance: {
-            fields: ['title', 'author', 'description'],
-            search: query,
-            sort: 'desc'
-          }
+        // Fixed: Remove _relevance and use a valid orderBy
+        orderBy: { 
+          publishedAt: 'desc' 
         },
         skip,
         take: limit

@@ -35,30 +35,31 @@ export default function CoursesPage() {
       status: statusFilter === 'all' ? undefined : statusFilter as CourseStatus
     })
     
-    // Fixed: Handle the actual API response structure safely
-    if (response && typeof response === 'object' && 'data' in response) {
-      // Handle PaginatedResponse structure
-      const coursesData = response.data;
-      if (Array.isArray(coursesData)) {
-        setCourses(coursesData);
-      } else if (coursesData && Array.isArray(coursesData.courses)) {
-        setCourses(coursesData.courses);
-      } else if (coursesData && Array.isArray(coursesData.data)) {
-        setCourses(coursesData.data);
+    // Fixed: Properly handle the PaginatedResponse structure with proper typing
+    if (response && response.success) {
+      // Handle different possible response structures
+      if (Array.isArray(response.data)) {
+        setCourses(response.data as CourseWithRelations[])
+      } else if (response.data && Array.isArray((response.data as any).courses)) {
+        setCourses((response.data as any).courses as CourseWithRelations[])
+      } else if (response.data && Array.isArray((response.data as any).data)) {
+        setCourses((response.data as any).data as CourseWithRelations[])
+      } else if (Array.isArray(response)) {
+        // Fallback: if response is directly an array
+        setCourses(response as CourseWithRelations[])
       } else {
-        setCourses([]);
+        console.warn('Unexpected response structure:', response)
+        setCourses([])
       }
-    } else if (Array.isArray(response)) {
-      // Handle direct array response
-      setCourses(response);
     } else {
-      setCourses([]);
+      console.warn('API response indicates failure:', response)
+      setCourses([])
     }
   } catch (error) {
-    console.error('Failed to fetch courses:', error);
-    setCourses([]);
+    console.error('Failed to fetch courses:', error)
+    setCourses([])
   } finally {
-    setIsLoading(false);
+    setIsLoading(false)
   }
 }
 

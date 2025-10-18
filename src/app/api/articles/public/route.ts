@@ -1,6 +1,7 @@
 // src/app/api/articles/public/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { ArticleController } from '@/controllers/ArticleController'
+export const dynamic = 'force-dynamic'
 
 // GET /api/articles/public - Get published articles (public)
 export async function GET(req: NextRequest) {

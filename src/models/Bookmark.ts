@@ -46,16 +46,25 @@ export class BookmarkModel {
     bookId?: string
     courseId?: string
   }): Promise<Bookmark> {
+    // Build the where condition based on the provided resource ID
+    let whereCondition: any = {
+      userId: data.userId,
+      type: data.type
+    }
+
+    // Set the appropriate resource ID based on type
+    if (data.articleId) {
+      whereCondition.articleId = data.articleId
+    } else if (data.bookId) {
+      whereCondition.bookId = data.bookId
+    } else if (data.courseId) {
+      whereCondition.courseId = data.courseId
+    } else {
+      throw new Error('At least one resource ID must be provided')
+    }
+
     return await prisma.bookmark.delete({
-      where: {
-        userId_type_articleId_bookId_courseId: {
-          userId: data.userId,
-          type: data.type,
-          articleId: data.articleId || null,
-          bookId: data.bookId || null,
-          courseId: data.courseId || null
-        }
-      }
+      where: whereCondition
     })
   }
 
@@ -88,16 +97,25 @@ export class BookmarkModel {
     bookId?: string
     courseId?: string
   }): Promise<boolean> {
-    const bookmark = await prisma.bookmark.findUnique({
-      where: {
-        userId_type_articleId_bookId_courseId: {
-          userId: data.userId,
-          type: data.type,
-          articleId: data.articleId || null,
-          bookId: data.bookId || null,
-          courseId: data.courseId || null
-        }
-      }
+    // Build the where condition based on the provided resource ID
+    let whereCondition: any = {
+      userId: data.userId,
+      type: data.type
+    }
+
+    // Set the appropriate resource ID based on type
+    if (data.articleId) {
+      whereCondition.articleId = data.articleId
+    } else if (data.bookId) {
+      whereCondition.bookId = data.bookId
+    } else if (data.courseId) {
+      whereCondition.courseId = data.courseId
+    } else {
+      throw new Error('At least one resource ID must be provided')
+    }
+
+    const bookmark = await prisma.bookmark.findFirst({
+      where: whereCondition
     })
 
     return !!bookmark
