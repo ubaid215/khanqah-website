@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
-import { uploadImage, validateImage } from '@/lib/upload'
+import { uploadFile, validateImage } from '@/lib/upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -33,6 +33,9 @@ interface ArticleFormData {
   readTime: number
   status: ArticleStatus
 }
+
+// Define progress callback type
+type UploadProgressCallback = (progress: number) => void;
 
 const initialFormData: ArticleFormData = {
   title: '',
@@ -63,6 +66,7 @@ export default function CreateArticlePage() {
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
   const [checkingSlug, setCheckingSlug] = useState(false)
   const [slugTouched, setSlugTouched] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   const showToast = (title: string, description?: string, variant: 'default' | 'destructive' | 'success' = 'default') => {
     setToast({ open: true, title, description, variant })
@@ -75,45 +79,46 @@ export default function CreateArticlePage() {
     setUploadError('')
     setSlugAvailable(null)
     setSlugTouched(false)
+    setUploadProgress(0)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
   }
 
-// Check if slug is available
-const checkSlugAvailability = async (slug: string) => {
-  if (!slug || slug.length < 3) {
-    setSlugAvailable(null)
-    return
+  // Check if slug is available
+  const checkSlugAvailability = async (slug: string) => {
+    if (!slug || slug.length < 3) {
+      setSlugAvailable(null)
+      return
+    }
+
+    setCheckingSlug(true)
+    try {
+      // Use the dedicated slug availability check method
+      const result = await apiClient.checkSlugAvailability(slug)
+      setSlugAvailable(result.available)
+    } catch (error: any) {
+      console.error('Error checking slug availability:', error)
+      // On error, set to null to show unknown state
+      setSlugAvailable(null)
+    } finally {
+      setCheckingSlug(false)
+    }
   }
 
-  setCheckingSlug(true)
-  try {
-    // Use the dedicated slug availability check method
-    const result = await apiClient.checkSlugAvailability(slug)
-    setSlugAvailable(result.available)
-  } catch (error: any) {
-    console.error('Error checking slug availability:', error)
-    // On error, set to null to show unknown state
-    setSlugAvailable(null)
-  } finally {
-    setCheckingSlug(false)
-  }
-}
+  // Also update the useEffect for debounced checking:
+  useEffect(() => {
+    if (formData.slug && slugTouched && formData.slug.length >= 3) {
+      const timer = setTimeout(() => {
+        checkSlugAvailability(formData.slug)
+      }, 500)
 
-// Also update the useEffect for debounced checking:
-useEffect(() => {
-  if (formData.slug && slugTouched && formData.slug.length >= 3) {
-    const timer = setTimeout(() => {
-      checkSlugAvailability(formData.slug)
-    }, 500)
-
-    return () => clearTimeout(timer)
-  } else if (!formData.slug || formData.slug.length < 3) {
-    // Reset if slug is too short or empty
-    setSlugAvailable(null)
-  }
-}, [formData.slug, slugTouched])
+      return () => clearTimeout(timer)
+    } else if (!formData.slug || formData.slug.length < 3) {
+      // Reset if slug is too short or empty
+      setSlugAvailable(null)
+    }
+  }, [formData.slug, slugTouched])
 
   // Debounced slug check
   useEffect(() => {
@@ -126,79 +131,78 @@ useEffect(() => {
     }
   }, [formData.slug, slugTouched])
 
- 
-const handleSubmit = async (e: React.FormEvent, publish: boolean = false) => {
-  e.preventDefault()
-  
-  // Validate form
-  if (!formData.title || !formData.content || !formData.slug) {
-    showToast('Validation Error', 'Please fill in all required fields.', 'destructive')
-    return
-  }
-
-  // Check slug availability before submitting
-  if (slugAvailable === false) {
-    showToast('Slug Taken', 'This slug is already in use. Please choose a different one.', 'destructive')
-    return
-  }
-
-  setIsLoading(true)
-
-  try {
-    const articleData = {
-      ...formData,
-      tagNames: tags,
-      thumbnail: thumbnail || undefined,
-      status: publish ? ArticleStatus.PUBLISHED : formData.status
+  const handleSubmit = async (e: React.FormEvent, publish: boolean = false) => {
+    e.preventDefault()
+    
+    // Validate form
+    if (!formData.title || !formData.content || !formData.slug) {
+      showToast('Validation Error', 'Please fill in all required fields.', 'destructive')
+      return
     }
-    
-    console.log('📝 Submitting article:', articleData)
-    
-    const response = await apiClient.createArticle(articleData)
-    
-    console.log('📝 API Response:', response)
-    
-    // Improved response handling
-    if (response && response.success === true) {
-      const message = publish ? 'Article published successfully!' : 'Article saved as draft!'
-      showToast('Success', message, 'success')
-      
-      // Reset form
-      resetForm()
-      
-      // Redirect after a short delay to show the toast
-      setTimeout(() => {
-        router.push('/admin/articles')
-      }, 1500)
-    } else {
-      // Handle API response that indicates failure
-      const errorMessage = response?.error || response?.message || 'Failed to create article'
-      
-      // Handle slug conflict specifically
-      if (errorMessage.toLowerCase().includes('slug') || errorMessage.includes('P2002')) {
-        setSlugAvailable(false)
-        showToast('Slug Taken', 'This slug is already taken. Please choose a different one.', 'destructive')
-      } else {
-        throw new Error(errorMessage)
+
+    // Check slug availability before submitting
+    if (slugAvailable === false) {
+      showToast('Slug Taken', 'This slug is already in use. Please choose a different one.', 'destructive')
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const articleData = {
+        ...formData,
+        tagNames: tags,
+        thumbnail: thumbnail || undefined,
+        status: publish ? ArticleStatus.PUBLISHED : formData.status
       }
+      
+      console.log('📝 Submitting article:', articleData)
+      
+      const response = await apiClient.createArticle(articleData)
+      
+      console.log('📝 API Response:', response)
+      
+      // Improved response handling
+      if (response && response.success === true) {
+        const message = publish ? 'Article published successfully!' : 'Article saved as draft!'
+        showToast('Success', message, 'success')
+        
+        // Reset form
+        resetForm()
+        
+        // Redirect after a short delay to show the toast
+        setTimeout(() => {
+          router.push('/admin/articles')
+        }, 1500)
+      } else {
+        // Handle API response that indicates failure
+        const errorMessage = response?.error || response?.message || 'Failed to create article'
+        
+        // Handle slug conflict specifically
+        if (errorMessage.toLowerCase().includes('slug') || errorMessage.includes('P2002')) {
+          setSlugAvailable(false)
+          showToast('Slug Taken', 'This slug is already taken. Please choose a different one.', 'destructive')
+        } else {
+          throw new Error(errorMessage)
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to create article:', error)
+      
+      let errorMessage = 'Failed to create article. Please try again.'
+      
+      if (error.message?.includes('slug already exists') || error.code === 'P2002') {
+        errorMessage = 'This slug is already taken. Please choose a different one.'
+        setSlugAvailable(false)
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      showToast('Error', errorMessage, 'destructive')
+    } finally {
+      setIsLoading(false)
     }
-  } catch (error: any) {
-    console.error('❌ Failed to create article:', error)
-    
-    let errorMessage = 'Failed to create article. Please try again.'
-    
-    if (error.message?.includes('slug already exists') || error.code === 'P2002') {
-      errorMessage = 'This slug is already taken. Please choose a different one.'
-      setSlugAvailable(false)
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-    
-    showToast('Error', errorMessage, 'destructive')
-  } finally {
-    setIsLoading(false)
   }
-}
 
   const handleSaveDraft = (e: React.FormEvent) => {
     handleSubmit(e, false)
@@ -278,18 +282,25 @@ const handleSubmit = async (e: React.FormEvent, publish: boolean = false) => {
 
     setUploadError('')
     setIsUploading(true)
+    setUploadProgress(0)
 
     try {
-      const result = await uploadImage(file)
+      // Create progress callback
+      const progressCallback: UploadProgressCallback = (progress: number) => {
+        setUploadProgress(progress)
+      }
+      
+      const result = await uploadFile(file, progressCallback)
       setThumbnail(result.url)
       showToast('Success', 'Image uploaded successfully!', 'success')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error)
-      const errorMessage = 'Failed to upload image. Please try again.'
+      const errorMessage = error.message || 'Failed to upload image. Please try again.'
       setUploadError(errorMessage)
       showToast('Upload Error', errorMessage, 'destructive')
     } finally {
       setIsUploading(false)
+      setUploadProgress(0)
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
@@ -568,22 +579,37 @@ const handleSubmit = async (e: React.FormEvent, publish: boolean = false) => {
                     onClick={() => !isLoading && !isUploading && fileInputRef.current?.click()}
                   >
                     {isUploading ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Uploading... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                        </p>
+                      </>
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <>
+                        <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Upload featured image
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-gray-300"
+                          disabled={isLoading || isUploading}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose Image
+                        </Button>
+                      </>
                     )}
-                    <p className="text-sm text-gray-600 mb-2">
-                      {isUploading ? 'Uploading...' : 'Upload featured image'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-gray-300"
-                      disabled={isLoading || isUploading}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose Image
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">

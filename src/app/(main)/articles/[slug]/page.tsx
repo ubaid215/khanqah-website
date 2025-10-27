@@ -135,7 +135,7 @@ const ArticleDetailPage = () => {
         setError(null);
         
         const slug = params.slug as string;
-        const response = await apiClient.getArticleBySlug(slug) as ArticleResponse;
+        const response = await apiClient.getArticleBySlug(slug) as unknown as ArticleResponse;
         
         const articleData = extractArticleData(response);
         

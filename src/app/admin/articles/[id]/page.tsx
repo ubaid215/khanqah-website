@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api'
-import { uploadImage, validateImage } from '@/lib/upload'
+import { uploadFile, validateImage } from '@/lib/upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -22,6 +22,9 @@ import {
 } from 'lucide-react'
 import { ArticleWithRelations, ArticleStatus } from '@/types'
 
+// Define progress callback type
+type UploadProgressCallback = (progress: number) => void;
+
 export default function EditArticlePage() {
   const router = useRouter()
   const params = useParams()
@@ -35,16 +38,17 @@ export default function EditArticlePage() {
   const [tags, setTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
   const [uploadError, setUploadError] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(0)
 
- const [formData, setFormData] = useState({
-  title: '',
-  slug: '',
-  content: '',
-  excerpt: '',
-  thumbnail: '',
-  readTime: 5,
-  status: ArticleStatus.DRAFT as ArticleStatus 
-})
+  const [formData, setFormData] = useState({
+    title: '',
+    slug: '',
+    content: '',
+    excerpt: '',
+    thumbnail: '',
+    readTime: 5,
+    status: ArticleStatus.DRAFT as ArticleStatus 
+  })
 
   useEffect(() => {
     fetchArticle()
@@ -54,19 +58,20 @@ export default function EditArticlePage() {
     try {
       const response = await apiClient.getArticleById(articleId)
       if (response.success) {
-        setArticle(response)
+        setArticle(response.data || response) // Handle both response formats
         setFormData({
-          title: response.title,
-          slug: response.slug,
-          content: response.content,
-          excerpt: response.excerpt || '',
-          thumbnail: response.thumbnail || '',
-          readTime: response.readTime || 5,
-          status: response.status
+          title: response.data?.title || response.title,
+          slug: response.data?.slug || response.slug,
+          content: response.data?.content || response.content,
+          excerpt: response.data?.excerpt || response.excerpt || '',
+          thumbnail: response.data?.thumbnail || response.thumbnail || '',
+          readTime: response.data?.readTime || response.readTime || 5,
+          status: response.data?.status || response.status
         })
         // Set tags from response
-        if (response.tags) {
-          setTags(response.tags.map((tag: any) => tag.tag.name))
+        if (response.data?.tags || response.tags) {
+          const tagsData = response.data?.tags || response.tags
+          setTags(tagsData.map((tag: any) => tag.tag?.name || tag.name || tag))
         }
       }
     } catch (error) {
@@ -122,15 +127,22 @@ export default function EditArticlePage() {
 
     setUploadError('')
     setIsUploading(true)
+    setUploadProgress(0)
 
     try {
-      const result = await uploadImage(file)
+      // Create progress callback
+      const progressCallback: UploadProgressCallback = (progress: number) => {
+        setUploadProgress(progress)
+      }
+      
+      const result = await uploadFile(file, progressCallback)
       setFormData(prev => ({ ...prev, thumbnail: result.url }))
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload failed:', error)
-      setUploadError('Failed to upload image. Please try again.')
+      setUploadError(error.message || 'Failed to upload image. Please try again.')
     } finally {
       setIsUploading(false)
+      setUploadProgress(0)
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
@@ -230,6 +242,7 @@ export default function EditArticlePage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Enter article title"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -242,6 +255,7 @@ export default function EditArticlePage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
                     placeholder="article-slug"
                     required
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -254,6 +268,7 @@ export default function EditArticlePage() {
                     onChange={(e) => setFormData(prev => ({ ...prev, excerpt: e.target.value }))}
                     placeholder="Brief description of the article"
                     rows={3}
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -267,6 +282,7 @@ export default function EditArticlePage() {
                     placeholder="Write your article content here..."
                     rows={12}
                     required
+                    disabled={isLoading}
                   />
                 </div>
               </CardContent>
@@ -291,11 +307,13 @@ export default function EditArticlePage() {
                         handleAddTag()
                       }
                     }}
+                    disabled={isLoading}
                   />
                   <Button
                     type="button"
                     onClick={handleAddTag}
                     className="bg-green-600 hover:bg-green-700 text-white"
+                    disabled={isLoading}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -312,7 +330,8 @@ export default function EditArticlePage() {
                         <button
                           type="button"
                           onClick={() => handleRemoveTag(tag)}
-                          className="ml-2 hover:text-green-600"
+                          className="ml-2 hover:text-green-600 disabled:opacity-50"
+                          disabled={isLoading}
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -342,6 +361,7 @@ export default function EditArticlePage() {
                     value={formData.status}
                     onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as ArticleStatus }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    disabled={isLoading}
                   >
                     <option value={ArticleStatus.DRAFT}>Draft</option>
                     <option value={ArticleStatus.PUBLISHED}>Published</option>
@@ -356,10 +376,11 @@ export default function EditArticlePage() {
                   <Input
                     type="number"
                     value={formData.readTime}
-                    onChange={(e) => setFormData(prev => ({ ...prev, readTime: parseInt(e.target.value) }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, readTime: parseInt(e.target.value) || 5 }))}
                     placeholder="5"
                     min="1"
                     max="60"
+                    disabled={isLoading}
                   />
                 </div>
               </CardContent>
@@ -379,30 +400,48 @@ export default function EditArticlePage() {
                   onChange={handleImageUpload}
                   accept="image/*"
                   className="hidden"
+                  disabled={isLoading || isUploading}
                 />
 
                 {!formData.thumbnail ? (
                   <div 
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-green-500 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      !isLoading && !isUploading ? 'hover:border-green-500' : 'opacity-50'
+                    }`}
+                    onClick={() => !isLoading && !isUploading && fileInputRef.current?.click()}
                   >
                     {isUploading ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Uploading... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                        </p>
+                      </>
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <>
+                        <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Upload featured image
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-gray-300"
+                          disabled={isLoading || isUploading}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose Image
+                        </Button>
+                      </>
                     )}
-                    <p className="text-sm text-gray-600 mb-2">
-                      {isUploading ? 'Uploading...' : 'Upload featured image'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-gray-300"
-                      disabled={isUploading}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose Image
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -415,7 +454,8 @@ export default function EditArticlePage() {
                       <button
                         type="button"
                         onClick={handleRemoveThumbnail}
-                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors disabled:opacity-50"
+                        disabled={isLoading}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -425,6 +465,7 @@ export default function EditArticlePage() {
                       variant="outline"
                       className="w-full border-gray-300"
                       onClick={() => fileInputRef.current?.click()}
+                      disabled={isLoading || isUploading}
                     >
                       Change Image
                     </Button>
@@ -463,6 +504,7 @@ export default function EditArticlePage() {
                     variant="outline"
                     className="w-full border-gray-300"
                     onClick={() => router.push('/admin/articles')}
+                    disabled={isLoading}
                   >
                     Cancel
                   </Button>

@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
-import { uploadImage, validateImage } from '@/lib/upload'
+import { uploadFile, validateImage, validateFile } from '@/lib/upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -43,6 +43,9 @@ const initialFormData: BookFormData = {
   status: BookStatus.DRAFT
 }
 
+// Define progress callback type
+type UploadProgressCallback = (progress: number) => void;
+
 export default function CreateBookPage() {
   const router = useRouter()
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -64,6 +67,7 @@ export default function CreateBookPage() {
   } | null>(null)
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
   const [checkingSlug, setCheckingSlug] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   const showToast = (title: string, description?: string, variant: 'default' | 'destructive' | 'success' = 'default') => {
     setToast({ open: true, title, description, variant })
@@ -76,6 +80,7 @@ export default function CreateBookPage() {
     setCoverError('')
     setFileError('')
     setSlugAvailable(null)
+    setUploadProgress(0)
     if (coverInputRef.current) coverInputRef.current.value = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -242,16 +247,22 @@ export default function CreateBookPage() {
     setIsCoverUploading(true)
 
     try {
-      const result = await uploadImage(file)
+      // Create progress callback
+      const progressCallback: UploadProgressCallback = (progress: number) => {
+        setUploadProgress(progress)
+      }
+      
+      const result = await uploadFile(file, progressCallback)
       setCoverImage(result.url)
       showToast('Success', 'Cover image uploaded successfully!', 'success')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Cover upload failed:', error)
-      const errorMessage = 'Failed to upload cover image. Please try again.'
+      const errorMessage = error.message || 'Failed to upload cover image. Please try again.'
       setCoverError(errorMessage)
       showToast('Upload Error', errorMessage, 'destructive')
     } finally {
       setIsCoverUploading(false)
+      setUploadProgress(0)
       if (coverInputRef.current) {
         coverInputRef.current.value = ''
       }
@@ -263,42 +274,46 @@ export default function CreateBookPage() {
     if (!file) return
 
     // Validate file type for books (PDF, EPUB, etc.)
-    const validTypes = ['application/pdf', 'application/epub+zip']
-    if (!validTypes.includes(file.type)) {
-      const errorMessage = 'Please select a valid book file (PDF or EPUB)'
-      setFileError(errorMessage)
-      showToast('Upload Error', errorMessage, 'destructive')
+    const validationError = validateFile(file)
+    if (validationError) {
+      setFileError(validationError)
+      showToast('Upload Error', validationError, 'destructive')
       return
     }
 
-    // Check file size (50MB max for books)
-    const maxSize = 50 * 1024 * 1024
-    if (file.size > maxSize) {
-      const errorMessage = 'Book file must be less than 50MB'
-      setFileError(errorMessage)
-      showToast('Upload Error', errorMessage, 'destructive')
-      return
+    // Show warning for large files
+    if (file.size > 100 * 1024 * 1024) {
+      showToast(
+        'Large File Detected',
+        `Uploading ${(file.size / (1024 * 1024)).toFixed(2)}MB. This may take several minutes.`,
+        'default'
+      )
     }
 
     setFileError('')
     setIsFileUploading(true)
+    setUploadProgress(0)
 
     try {
-      // In a real app, you'd upload to your file storage
-      // For now, we'll simulate the upload
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      console.log('📤 Uploading book file to local server...')
       
-      // Simulate file upload response
-      const mockUrl = `/uploads/books/${Date.now()}-${file.name}`
-      setFileUrl(mockUrl)
+      // Create progress callback
+      const progressCallback: UploadProgressCallback = (progress: number) => {
+        setUploadProgress(progress)
+      }
+      
+      const result = await uploadFile(file, progressCallback)
+      setFileUrl(result.url)
       showToast('Success', 'Book file uploaded successfully!', 'success')
-    } catch (error) {
-      console.error('File upload failed:', error)
-      const errorMessage = 'Failed to upload book file. Please try again.'
+      console.log('✅ Book file uploaded:', result.url)
+    } catch (error: any) {
+      console.error('❌ File upload failed:', error)
+      const errorMessage = error.message || 'Failed to upload book file. Please try again.'
       setFileError(errorMessage)
       showToast('Upload Error', errorMessage, 'destructive')
     } finally {
       setIsFileUploading(false)
+      setUploadProgress(0)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -508,22 +523,37 @@ export default function CreateBookPage() {
                     onClick={() => !isLoading && !isCoverUploading && coverInputRef.current?.click()}
                   >
                     {isCoverUploading ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Uploading... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                        </p>
+                      </>
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <>
+                        <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Upload cover image
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-gray-300"
+                          disabled={isLoading || isCoverUploading}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose Image
+                        </Button>
+                      </>
                     )}
-                    <p className="text-sm text-gray-600 mb-2">
-                      {isCoverUploading ? 'Uploading...' : 'Upload cover image'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-gray-300"
-                      disabled={isLoading || isCoverUploading}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose Image
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -559,7 +589,7 @@ export default function CreateBookPage() {
                 )}
 
                 <p className="text-xs text-gray-500 mt-3">
-                  Recommended: 400×600 pixels, JPEG/PNG format, max 5MB
+                  Recommended: 400×600 pixels, JPEG/PNG format, max 10MB
                 </p>
               </CardContent>
             </Card>
@@ -589,29 +619,54 @@ export default function CreateBookPage() {
                     onClick={() => !isLoading && !isFileUploading && fileInputRef.current?.click()}
                   >
                     {isFileUploading ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                            <div 
+                              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">
+                          Uploading... {uploadProgress > 0 ? `${uploadProgress}%` : ''}
+                        </p>
+                      </>
                     ) : (
-                      <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <>
+                        <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">
+                          Upload book file
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-gray-300"
+                          disabled={isLoading || isFileUploading}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose File
+                        </Button>
+                      </>
                     )}
-                    <p className="text-sm text-gray-600 mb-2">
-                      {isFileUploading ? 'Uploading...' : 'Upload book file'}
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-gray-300"
-                      disabled={isLoading || isFileUploading}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose File
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
-                      <div className="flex items-center space-x-2 text-green-800">
-                        <FileText className="h-5 w-5" />
-                        <span className="font-medium">Book file uploaded successfully</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 text-green-800">
+                          <FileText className="h-5 w-5" />
+                          <span className="font-medium">Book file uploaded</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveFile}
+                          className="p-1 text-green-700 hover:text-green-900 transition-colors"
+                          disabled={isLoading}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                     <Button
@@ -631,7 +686,7 @@ export default function CreateBookPage() {
                 )}
 
                 <p className="text-xs text-gray-500 mt-3">
-                  Supported formats: PDF, EPUB • Max size: 50MB
+                  Supported formats: PDF, EPUB • Max size: 500MB
                 </p>
               </CardContent>
             </Card>

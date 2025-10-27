@@ -2,9 +2,10 @@
 
 import { motion, easeOut, easeInOut } from 'framer-motion';
 import HeroSlider from '@/components/shared/HeroSlider';
-import { BookOpen, Users, Heart, Sparkles, ArrowRight, Book, FileText, Star, Scale, Gem, Calendar, Building } from 'lucide-react';
+import { BookOpen, Users, Heart, Sparkles, ArrowRight, Book, FileText, Star, Scale, Gem, Calendar, Building, Clock, Compass, Sunrise, Sun, Moon, SunIcon } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 // Define types for our data
 interface Article {
@@ -26,6 +27,33 @@ interface Book {
   slug?: string;
 }
 
+interface PrayerTime {
+  name: string;
+  time: string;
+  icon: any;
+  isCurrent?: boolean;
+  isNext?: boolean;
+}
+
+// Helper function to safely get error message
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  } else if (typeof error === 'string') {
+    return error;
+  } else {
+    return 'An unknown error occurred';
+  }
+};
+
+// Helper function to safely get error stack
+const getErrorStack = (error: unknown): string | undefined => {
+  if (error instanceof Error) {
+    return error.stack;
+  }
+  return undefined;
+};
+
 const Homepage = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
@@ -35,6 +63,238 @@ const Homepage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
+  const [prayerTimes, setPrayerTimes] = useState<PrayerTime[]>([
+    { name: 'Fajr', time: 'Loading...', icon: Sunrise, isCurrent: false },
+    { name: 'Dhuhr', time: 'Loading...', icon: Sun, isCurrent: false },
+    { name: 'Asr', time: 'Loading...', icon: Clock, isNext: false },
+    { name: 'Maghrib', time: 'Loading...', icon: SunIcon },
+    { name: 'Isha', time: 'Loading...', icon: Moon }
+  ]);
+  const [prayerLoading, setPrayerLoading] = useState(true);
+
+  // Improved 12-hour conversion function
+  const convertTo12Hour = (time24: string) => {
+    try {
+      // Handle cases where time might be in unexpected format
+      if (!time24 || typeof time24 !== 'string') {
+        return '--:--';
+      }
+      
+      const [hours, minutes] = time24.split(':');
+      const hour = parseInt(hours);
+      const minute = parseInt(minutes);
+      
+      if (isNaN(hour) || isNaN(minute)) {
+        return '--:--';
+      }
+      
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minute.toString().padStart(2, '0')} ${ampm}`;
+    } catch (error) {
+      console.error('Error converting time:', error);
+      return '--:--';
+    }
+  };
+
+  // Improved current prayer detection
+  const determineCurrentPrayer = (prayers: PrayerTime[]) => {
+    const now = new Date();
+    const currentTime = now.toLocaleTimeString('en-US', { 
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    const [currentHours, currentMinutes] = currentTime.split(':').map(Number);
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
+    
+    let currentPrayerIndex = -1;
+    
+    // Convert all prayer times to minutes for comparison
+    const prayerMinutes = prayers.map(prayer => {
+      const [time, period] = prayer.time.split(' ');
+      const [hours, minutes] = time.split(':').map(Number);
+      
+      let totalMinutes = hours * 60 + minutes;
+      
+      // Adjust for PM times (except 12 PM)
+      if (period === 'PM' && hours !== 12) {
+        totalMinutes += 12 * 60;
+      }
+      // Adjust for 12 AM (midnight)
+      if (period === 'AM' && hours === 12) {
+        totalMinutes -= 12 * 60;
+      }
+      
+      return totalMinutes;
+    });
+    
+    // Find the current prayer
+    for (let i = 0; i < prayerMinutes.length; i++) {
+      if (currentTotalMinutes < prayerMinutes[i]) {
+        currentPrayerIndex = i - 1;
+        break;
+      }
+    }
+    
+    // If before Fajr, current prayer is Isha (previous day)
+    if (currentPrayerIndex === -1) {
+      currentPrayerIndex = prayers.length - 1;
+    }
+    
+    // Reset all prayers first
+    const updatedPrayers = prayers.map(prayer => ({
+      ...prayer,
+      isCurrent: false,
+      isNext: false
+    }));
+    
+    // Set current prayer
+    if (currentPrayerIndex >= 0) {
+      updatedPrayers[currentPrayerIndex].isCurrent = true;
+      
+      // Set next prayer
+      const nextPrayerIndex = (currentPrayerIndex + 1) % prayers.length;
+      updatedPrayers[nextPrayerIndex].isNext = true;
+    }
+    
+    return updatedPrayers;
+  };
+
+  // Improved Islamic date function using API
+  const getIslamicDate = () => {
+    try {
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0];
+      const [year, month, day] = dateString.split('-');
+      
+      // You can fetch the actual Islamic date from the same API
+      // For now, using a simple approximation
+      const islamicMonths = [
+        'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani', 
+        'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', 'Sha\'ban', 
+        'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah'
+      ];
+      
+      // This is a very rough approximation - in production, use a proper library
+      // or fetch from the API: data.data.date.hijri in the prayer time response
+      const daysSinceEpoch = Math.floor(today.getTime() / (1000 * 60 * 60 * 24));
+      const islamicDay = (daysSinceEpoch % 30) + 1;
+      const islamicMonthIndex = Math.floor((daysSinceEpoch % 360) / 30);
+      const islamicYear = 1446; // Approximate current Islamic year
+      
+      return `${islamicDay} ${islamicMonths[islamicMonthIndex]} ${islamicYear}`;
+    } catch (error) {
+      return 'Loading...';
+    }
+  };
+
+  // Updated prayer time fetching function
+  const fetchPrayerTimes = async () => {
+    try {
+      setPrayerLoading(true);
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0];
+      const [year, month, day] = dateString.split('-');
+      
+      // Using coordinates is more reliable than city name
+      const latitude = 31.4504;
+      const longitude = 73.1350;
+      
+      const apiUrl = `https://api.aladhan.com/v1/timings/${day}-${month}-${year}?latitude=${latitude}&longitude=${longitude}&method=1&school=1`;
+      
+      console.log('🕌 Fetching prayer times from:', apiUrl);
+      
+      const response = await fetch(apiUrl);
+      
+      console.log('📡 API Response Status:', response.status, response.ok);
+      
+      if (!response.ok) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Prayer API Full Response:', data);
+      
+      if (data.code !== 200) {
+        throw new Error(`API error code: ${data.code}`);
+      }
+      
+      if (data.data && data.data.timings) {
+        const timings = data.data.timings;
+        console.log('🕐 Raw timings from API:', timings);
+        
+        // Convert to 12-hour format and update state
+        const updatedPrayerTimes = [
+          { 
+            name: 'Fajr', 
+            time: convertTo12Hour(timings.Fajr), 
+            icon: Sunrise, 
+            isCurrent: false 
+          },
+          { 
+            name: 'Dhuhr', 
+            time: convertTo12Hour(timings.Dhuhr), 
+            icon: Sun, 
+            isCurrent: false 
+          },
+          { 
+            name: 'Asr', 
+            time: convertTo12Hour(timings.Asr), 
+            icon: Clock, 
+            isNext: false 
+          },
+          { 
+            name: 'Maghrib', 
+            time: convertTo12Hour(timings.Maghrib), 
+            icon: SunIcon 
+          },
+          { 
+            name: 'Isha', 
+            time: convertTo12Hour(timings.Isha), 
+            icon: Moon 
+          }
+        ];
+        
+        console.log('🕐 Converted prayer times:', updatedPrayerTimes);
+        
+        // Determine current and next prayer
+        const currentPrayer = determineCurrentPrayer(updatedPrayerTimes);
+        
+        setPrayerTimes(currentPrayer);
+        console.log('✅ Prayer times set successfully');
+      } else {
+        throw new Error('Invalid API response structure');
+      }
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      const errorStack = getErrorStack(error);
+      
+      console.error('❌ Error fetching prayer times:', error);
+      console.error('Error details:', {
+        message: errorMessage,
+        stack: errorStack
+      });
+      
+      // Show error to user
+      setError('Unable to fetch live prayer times. Showing approximate times.');
+      
+      // Fallback to sample times with current/next detection
+      const fallbackTimes = [
+        { name: 'Fajr', time: '05:30 AM', icon: Sunrise, isCurrent: false },
+        { name: 'Dhuhr', time: '12:15 PM', icon: Sun, isCurrent: false },
+        { name: 'Asr', time: '03:45 PM', icon: Clock, isNext: false },
+        { name: 'Maghrib', time: '05:25 PM', icon: SunIcon },
+        { name: 'Isha', time: '07:00 PM', icon: Moon }
+      ];
+      
+      const currentPrayer = determineCurrentPrayer(fallbackTimes);
+      setPrayerTimes(currentPrayer);
+    } finally {
+      setPrayerLoading(false);
+    }
+  };
 
   // Five Pillars of Islam data
   const pillars = [
@@ -138,26 +398,26 @@ const Homepage = () => {
     }
   };
 
- const imageVariants = {
-  hidden: { opacity: 0, scale: 0.8, y: 50 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: easeOut
+  const imageVariants = {
+    hidden: { opacity: 0, scale: 0.8, y: 50 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: easeOut
+      }
+    },
+    hover: {
+      scale: 1.05,
+      rotate: 2,
+      transition: {
+        duration: 0.3,
+        ease: easeInOut
+      }
     }
-  },
-  hover: {
-    scale: 1.05,
-    rotate: 2,
-    transition: {
-      duration: 0.3,
-      ease: easeInOut
-    }
-  }
-};
+  };
 
   // Debug function to log API responses
   const debugResponse = (type: string, response: any) => {
@@ -309,6 +569,7 @@ const Homepage = () => {
   useEffect(() => {
     console.log('🚀 Homepage mounted, starting sequential data fetching...');
     fetchAllData();
+    fetchPrayerTimes(); // Fetch prayer times on mount
   }, []);
 
   // Helper functions for default images
@@ -585,15 +846,173 @@ const Homepage = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="text-center mt-12"
           >
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2"
-            >
-              Browse All Courses
-              <ArrowRight className="w-5 h-5" />
-            </motion.button>
+            {/* <Link href="/courses">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 inline-flex items-center gap-2"
+              >
+                Browse All Courses
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+            </Link> */}
           </motion.div>
+        </div>
+      </section>
+
+      {/* Prayer Times Section */}
+      <section className="py-16 sm:py-20 lg:py-24 bg-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left Side - Image */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="relative"
+            >
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                <img
+                  src="/images/img-2.jpg"
+                  alt="Prayer at Mosque - Spiritual Connection"
+                  className="w-full h-auto object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
+              </div>
+              
+              {/* Decorative elements */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="absolute -top-4 -right-4 w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl rotate-12 shadow-xl"
+              ></motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+                className="absolute -bottom-4 -left-4 w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl -rotate-12 shadow-xl"
+              ></motion.div>
+            </motion.div>
+
+            {/* Right Side - Prayer Times */}
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="space-y-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                  <Compass className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
+                  Prayer Times
+                </h2>
+              </div>
+              
+              <p className="text-lg text-gray-600 leading-relaxed">
+                Today's prayer schedule according to <span className="font-semibold text-emerald-600">Sunni Hanafi Fiqh</span> for Faisalabad, Pakistan. 
+                Stay connected with your daily spiritual obligations.
+              </p>
+
+              {/* Prayer Times Display */}
+              <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <div className="text-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    Faisalabad, Pakistan
+                  </h3>
+                  <p className="text-gray-600">
+                    {new Date().toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric',
+                      timeZone: 'Asia/Karachi'
+                    })}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Islamic Date: <span className="font-medium">{getIslamicDate()}</span>
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {prayerTimes.map((prayer, index) => {
+                    const Icon = prayer.icon;
+                    return (
+                      <motion.div
+                        key={prayer.name}
+                        initial={{ opacity: 0, x: 20 }}
+                        whileInView={{ opacity: 1, x: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02 }}
+                        className={`flex items-center justify-between p-4 rounded-xl transition-all duration-300 ${
+                          prayer.isCurrent 
+                            ? 'bg-emerald-500 text-white shadow-lg' 
+                            : prayer.isNext
+                            ? 'bg-amber-100 border border-amber-200'
+                            : 'bg-white border border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            prayer.isCurrent 
+                              ? 'bg-white/20' 
+                              : prayer.isNext
+                              ? 'bg-amber-500/10'
+                              : 'bg-gray-100'
+                          }`}>
+                            <Icon className={`w-5 h-5 ${
+                              prayer.isCurrent ? 'text-white' : prayer.isNext ? 'text-amber-600' : 'text-gray-600'
+                            }`} />
+                          </div>
+                          <div>
+                            <h4 className={`font-semibold ${
+                              prayer.isCurrent ? 'text-white' : 'text-gray-900'
+                            }`}>
+                              {prayer.name}
+                            </h4>
+                            {prayer.isCurrent && (
+                              <span className="text-sm opacity-90">Current Prayer</span>
+                            )}
+                            {prayer.isNext && (
+                              <span className="text-sm text-amber-600 font-medium">Next Prayer</span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="text-right">
+                          <p className={`text-lg font-bold ${
+                            prayer.isCurrent ? 'text-white' : prayer.isNext ? 'text-amber-600' : 'text-gray-900'
+                          }`}>
+                            {prayer.time}
+                          </p>
+                          {!prayer.isCurrent && !prayer.isNext && (
+                            <p className="text-xs text-gray-500">Local Time</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.6 }}
+                  className="mt-6 text-center"
+                >
+                  
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -728,14 +1147,16 @@ const Homepage = () => {
                     )}
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2"
-                  >
-                    View All Articles
-                    <ArrowRight className="w-5 h-5" />
-                  </motion.button>
+                  <Link href="/articles">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                    >
+                      View All Articles
+                      <ArrowRight className="w-5 h-5" />
+                    </motion.button>
+                  </Link>
                 </motion.div>
               )}
 
@@ -791,14 +1212,16 @@ const Homepage = () => {
                     )}
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2"
-                  >
-                    Explore Library
-                    <ArrowRight className="w-5 h-5" />
-                  </motion.button>
+                  <Link href="/books">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="mt-6 w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                    >
+                      Explore Library
+                      <ArrowRight className="w-5 h-5" />
+                    </motion.button>
+                  </Link>
                 </motion.div>
               )}
             </div>

@@ -24,6 +24,7 @@ interface Book {
   publishYear?: string;
   featured: boolean;
   status?: string;
+  filePath?: string; // Added for direct file access
 }
 
 const BooksPage = () => {
@@ -44,14 +45,20 @@ const BooksPage = () => {
   const categories = ['All', 'Quran', 'Hadith', 'Fiqh', 'Aqeedah', 'Seerah', 'Spirituality', 'Arabic', 'History'];
   const languages = ['All', 'English', 'Arabic', 'Urdu', 'Turkish'];
 
-  // Debug function to log API responses
-  const debugResponse = (type: string, response: any) => {
-    console.log(`🔍 ${type} API Response:`, {
-      success: response.success,
-      data: response.data,
-      hasData: !!response.data,
-      dataStructure: response.data ? Object.keys(response.data) : 'no data',
-      fullResponse: response
+  // Enhanced debug function
+  const debugBookData = (book: any, index: number) => {
+    console.log(`📖 Book ${index}:`, {
+      id: book.id,
+      title: book.title,
+      coverSources: {
+        image: book.image,
+        coverImage: book.coverImage,
+        thumbnail: book.thumbnail,
+        cover: book.cover,
+        finalCover: book.cover
+      },
+      filePath: book.filePath || book.fileUrl,
+      hasValidImage: !!book.cover && book.cover.startsWith('/uploads/')
     });
   };
 
@@ -66,8 +73,6 @@ const BooksPage = () => {
         page: 1,
         limit: 100, 
       });
-
-      debugResponse('Books', response);
 
       if (response.success && response.data) {
         let booksData: any[] = [];
@@ -84,26 +89,50 @@ const BooksPage = () => {
         console.log('📚 Extracted books data:', booksData);
 
         if (booksData && booksData.length > 0) {
-          const mappedBooks = booksData.map((book: any) => ({
-            id: book.id,
-            slug: book.slug || `book-${book.id}`,
-            title: book.title || 'Untitled Book',
-            subtitle: book.subtitle,
-            author: book.author || 'Unknown Author',
-            description: book.description || book.summary || 'A valuable Islamic book for spiritual growth',
-            cover: book.image || book.coverImage || book.thumbnail || getDefaultBookImage(book.title),
-            category: book.category?.name || book.category || 'Spirituality',
-            language: book.language || 'English',
-            pages: book.pages || Math.floor(Math.random() * 500) + 100,
-            fileSize: book.fileSize || `${(Math.random() * 10 + 1).toFixed(1)} MB`,
-            format: book.format || 'PDF',
-            downloads: book.downloads || book.downloadCount || Math.floor(Math.random() * 20000) + 1000,
-            rating: book.rating || parseFloat((Math.random() * 0.5 + 4.5).toFixed(1)),
-            reviews: book.reviews || book.reviewCount || Math.floor(Math.random() * 500) + 50,
-            publishYear: book.publishYear || book.publishedAt?.substring(0, 4) || '2020',
-            featured: book.featured || false,
-            status: book.status
-          }));
+          const mappedBooks = booksData.map((book: any, index: number) => {
+            // Fix image URL handling for local files
+            let coverUrl = book.image || book.coverImage || book.thumbnail || book.cover;
+            
+            // Ensure uploads path is correct
+            if (coverUrl) {
+              if (coverUrl.startsWith('uploads/')) {
+                coverUrl = '/' + coverUrl;
+              } else if (!coverUrl.startsWith('http') && !coverUrl.startsWith('/')) {
+                // Assume it's a local file that needs proper path
+                coverUrl = '/uploads/' + coverUrl;
+              }
+            } else {
+              // Use default image if no cover
+              coverUrl = getDefaultBookImage(book.title);
+            }
+
+            const mappedBook = {
+              id: book.id,
+              slug: book.slug || `book-${book.id}`,
+              title: book.title || 'Untitled Book',
+              subtitle: book.subtitle,
+              author: book.author || 'Unknown Author',
+              description: book.description || book.summary || 'A valuable Islamic book for spiritual growth',
+              cover: coverUrl,
+              category: book.category?.name || book.category || 'Spirituality',
+              language: book.language || 'English',
+              pages: book.pages || Math.floor(Math.random() * 500) + 100,
+              fileSize: book.fileSize || `${(Math.random() * 10 + 1).toFixed(1)} MB`,
+              format: book.format || 'PDF',
+              downloads: book.downloads || book.downloadCount || Math.floor(Math.random() * 20000) + 1000,
+              rating: book.rating || parseFloat((Math.random() * 0.5 + 4.5).toFixed(1)),
+              reviews: book.reviews || book.reviewCount || Math.floor(Math.random() * 500) + 50,
+              publishYear: book.publishYear || book.publishedAt?.substring(0, 4) || '2020',
+              featured: book.featured || false,
+              status: book.status,
+              // Add file path for downloads
+              filePath: book.filePath || book.fileUrl || `/uploads/books/${book.id}.${book.format?.toLowerCase() || 'pdf'}`
+            };
+
+            // Debug each book
+            debugBookData(mappedBook, index);
+            return mappedBook;
+          });
           
           console.log('📚 Mapped books:', mappedBooks);
           setBooks(mappedBooks);
@@ -140,7 +169,7 @@ const BooksPage = () => {
     const averageRating = booksData.length > 0 
       ? booksData.reduce((sum, book) => sum + book.rating, 0) / booksData.length 
       : 0;
-    const activeReaders = Math.floor(totalDownloads * 0.1); // Estimate active readers as 10% of downloads
+    const activeReaders = Math.floor(totalDownloads * 0.1);
 
     setStats({
       totalBooks,
@@ -153,20 +182,20 @@ const BooksPage = () => {
   // Helper function for default book images
   const getDefaultBookImage = (title: string) => {
     const images = [
-      'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1585506019033-e6e14d8b0c70?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1609599006353-e629aaabfeae?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1612178537253-bccd437b730e?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1584286595398-a59f83aec53f?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&h=600&fit=crop'
+      '/uploads/default-book-1.jpg',
+      '/uploads/default-book-2.jpg',
+      '/uploads/default-book-3.jpg',
+      '/uploads/default-book-4.jpg',
     ];
-    return images[Math.floor(Math.random() * images.length)];
+    // Fallback to a solid color if no default images exist
+    return `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600"><rect width="400" height="600" fill="%23f3f4f6"/><text x="200" y="300" font-family="Arial" font-size="24" text-anchor="middle" fill="%236b7280">${encodeURIComponent(title)}</text></svg>`;
+  };
+
+  // Image error handler
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>, bookTitle: string) => {
+    const target = e.target as HTMLImageElement;
+    console.warn(`🖼 Image failed to load: ${target.src}`);
+    target.src = getDefaultBookImage(bookTitle);
   };
 
   useEffect(() => {
@@ -196,8 +225,6 @@ const BooksPage = () => {
     }
   });
 
-  const featuredBooks = books.filter(b => b.featured);
-
   // Loading skeleton
   const BookSkeleton = () => (
     <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
@@ -208,19 +235,6 @@ const BooksPage = () => {
         <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
         <div className="h-8 bg-gray-200 rounded"></div>
       </div>
-    </div>
-  );
-
-  // Stats skeleton
-  const StatsSkeleton = () => (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-gray-100 animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-8 mb-2"></div>
-          <div className="h-6 bg-gray-200 rounded mb-1"></div>
-          <div className="h-4 bg-gray-200 rounded w-16"></div>
-        </div>
-      ))}
     </div>
   );
 
@@ -258,6 +272,12 @@ const BooksPage = () => {
       {error && (
         <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
           <strong>Error:</strong> {error}
+          <button 
+            onClick={() => setError(null)}
+            className="ml-4 text-red-800 hover:text-red-900"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -304,7 +324,7 @@ const BooksPage = () => {
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-      
+       
 
         {/* Filters */}
         {!loading && books.length > 0 && (
@@ -313,27 +333,7 @@ const BooksPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 sm:mb-12"
           >
-            <div className="flex flex-col sm:flex-row gap-4">
-              {/* Category Filter */}
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => setSelectedCategory(category)}
-                      className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
-                        selectedCategory === category
-                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                      }`}
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+           
 
             <div className="flex flex-col sm:flex-row gap-4 mt-4">
               {/* Language Filter */}
@@ -388,6 +388,9 @@ const BooksPage = () => {
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 {selectedCategory === 'All' ? 'All Books' : `${selectedCategory} Books`}
               </h2>
+              <p className="text-gray-600">
+                Browse our collection of Islamic books available for free download
+              </p>
             </motion.div>
           )}
 
@@ -401,7 +404,12 @@ const BooksPage = () => {
             filteredBooks.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
                 {filteredBooks.map((book, index) => (
-                  <BookCard key={book.id} book={book} index={index} />
+                  <BookCard 
+                    key={book.id} 
+                    book={book} 
+                    index={index} 
+                    onImageError={handleImageError}
+                  />
                 ))}
               </div>
             ) : (
@@ -430,31 +438,88 @@ const BooksPage = () => {
   );
 };
 
-const BookCard = ({ book, index, featured = false }: { book: Book; index: number; featured?: boolean }) => {
+const BookCard = ({ 
+  book, 
+  index, 
+  featured = false,
+  onImageError 
+}: { 
+  book: Book; 
+  index: number; 
+  featured?: boolean;
+  onImageError: (e: React.SyntheticEvent<HTMLImageElement, Event>, title: string) => void;
+}) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const handleDownload = async () => {
     try {
-      // Use the API client to download the book
-      const response = await apiClient.downloadBook(book.id);
-      if (response.downloadUrl) {
-        window.open(response.downloadUrl, '_blank');
+      console.log('📥 Starting download for book:', book.title);
+      
+      // Try direct file path first
+      if (book.filePath && book.filePath.startsWith('/uploads/')) {
+        console.log('📁 Using direct file path:', book.filePath);
+        window.open(book.filePath, '_blank');
+        return;
       }
+
+      // Try API download endpoints
+      const downloadEndpoints = [
+        `/api/books/${book.id}/download`,
+        `/api/books/${book.slug}/download`,
+        `/api/download/${book.id}`,
+      ];
+
+      for (const endpoint of downloadEndpoints) {
+        try {
+          console.log('🔄 Trying download endpoint:', endpoint);
+          
+          const response = await fetch(endpoint);
+          if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            // Get filename
+            const contentDisposition = response.headers.get('content-disposition');
+            let filename = `${book.title}.${book.format?.toLowerCase() || 'pdf'}`;
+            
+            if (contentDisposition) {
+              const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+              if (filenameMatch) filename = filenameMatch[1];
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            return; // Success, exit loop
+          }
+        } catch (error) {
+          console.warn(`Download endpoint failed: ${endpoint}`, error);
+          continue;
+        }
+      }
+
+      // If all methods fail
+      throw new Error('All download methods failed');
+
     } catch (error) {
-      console.error('Error downloading book:', error);
-      // Fallback to direct download if API fails
-      window.open(`/api/books/${book.id}/download`, '_blank');
+      console.error('❌ Error downloading book:', error);
+      alert('Download failed. The file may not be available. Please try again later.');
     }
   };
 
   const handleBookmark = async () => {
     try {
       await apiClient.createBookmark({
-        bookId: book.id, // Only include properties that exist in CreateBookmarkData
+        bookId: book.id,
         type: 'BOOK'
-        // Remove title, description, image as they're not in the type
       });
-      // You might want to show a success message here
+      // Show success message (you can add a toast here)
     } catch (error) {
       console.error('Error bookmarking book:', error);
     }
@@ -475,8 +540,20 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
         <img
           src={book.cover}
           alt={book.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => setImageLoaded(true)}
+          onError={(e) => onImageError(e, book.title)}
         />
+        
+        {/* Loading skeleton */}
+        {!imageLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+          </div>
+        )}
+
         {featured && (
           <div className="absolute top-2 left-2 px-2 py-1 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center gap-1">
             <Star className="w-2.5 h-2.5 fill-current" />
@@ -497,6 +574,7 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
                 whileTap={{ scale: 0.9 }}
                 onClick={handleDownload}
                 className="flex-1 p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors"
+                title="Download Book"
               >
                 <Download className="w-4 h-4 text-gray-900 mx-auto" />
               </motion.button>
@@ -505,6 +583,7 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
                 whileTap={{ scale: 0.9 }}
                 onClick={handleBookmark}
                 className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors"
+                title="Add to Bookmarks"
               >
                 <Heart className="w-4 h-4 text-gray-900" />
               </motion.button>
@@ -512,6 +591,7 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 className="p-2 bg-white/90 backdrop-blur-sm rounded-lg hover:bg-white transition-colors"
+                title="Share Book"
               >
                 <Share2 className="w-4 h-4 text-gray-900" />
               </motion.button>
@@ -527,11 +607,7 @@ const BookCard = ({ book, index, featured = false }: { book: Book; index: number
         </h3>
         <p className="text-xs text-gray-600 mb-2 line-clamp-1">{book.author}</p>
 
-        <div className="flex items-center gap-1.5 mb-3 text-xs text-gray-500">
-          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-          <span className="font-semibold text-gray-900">{book.rating}</span>
-          <span>({book.reviews})</span>
-        </div>
+        
 
         <div className="flex items-center justify-between text-xs text-gray-500 mb-3 pb-3 border-b border-gray-100">
           <div className="flex items-center gap-1">

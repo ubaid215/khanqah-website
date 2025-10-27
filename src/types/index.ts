@@ -293,6 +293,7 @@ export interface ArticleFilters {
 
 // Fix: Remove the problematic index signature and merge duplicate ArticleWithRelations
 export interface ArticleWithRelations {
+  data: ArticleWithRelations
   success: any
   id: string
   title: string
@@ -344,6 +345,7 @@ export interface BookFilters {
 
 // Fix: Remove the problematic index signature from BookWithRelations
 export interface BookWithRelations {
+  data: BookWithRelations
   success: any
   id: string
   title: string
