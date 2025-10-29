@@ -60,8 +60,8 @@ const Footer = () => {
 
   const contactInfo = [
     { icon: Mail, text: 'khanqahsaifia@gmail.com' },
-    { icon: Phone, text: '+92301-0000000' },
-    { icon: MapPin, text: 'Khanqah Aliya Murshidabad Shareef, Jhand Road Faisalabd, Pakistan' },
+    { icon: Phone, text: '+92321-7677062' },
+    { icon: MapPin, text: 'Khanqah Aliya Murshidabad Shareef, Jhang Road Faisalabd, Pakistan' },
   ];
 
   return (
