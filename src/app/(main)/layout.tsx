@@ -1,6 +1,7 @@
 // src/app/(main)/layout.tsx
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import Navbar from "@/components/layout/Navbar";
@@ -10,8 +11,12 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+
 export default function MainLayout({ children }: MainLayoutProps) {
   const { isLoading } = useAuth();
+  const pathname      = usePathname();
+
+
 
   if (isLoading) {
     return (
@@ -21,30 +26,17 @@ export default function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
+ 
+
   return (
     <div className="min-h-screen">
-      <div>
-        <Navbar />
+      <Navbar />
 
-        {/* Main content - Fully responsive padding for navbar */}
-        <main className=" pt-[56px] sm:pt-[64px] lg:pt-[112px]">
-          {children}
-        </main>
+      <main className="pt-[56px] sm:pt-[64px] lg:pt-[112px]">
+        {children}
+      </main>
 
-        <style jsx>{`
-          @media (min-width: 640px) {
-            main {
-              padding-top: var(--navbar-height-tablet);
-            }
-          }
-          @media (min-width: 1024px) {
-            main {
-              padding-top: var(--navbar-height-desktop);
-            }
-          }
-        `}</style>
-        <Footer />
-      </div>
+      <Footer />
     </div>
   );
 }

@@ -2,71 +2,255 @@
 
 @import "tailwindcss";
 
+@import "tw-animate-css";
+
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+  
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    /* Sacred Editorial Color System - Light Mode (Ivory Base) */
+    --background: 42 30% 96%;        /* #fbf9f5 - Ivory */
+    --foreground: 100 3% 10%;        /* #1b1c1a - Ink Primary */
+
+    --card: 0 0% 100%;               /* #ffffff - Pure White */
+    --card-foreground: 100 3% 10%;   /* #1b1c1a */
+
+    --popover: 0 0% 100%;            /* #ffffff */
+    --popover-foreground: 100 3% 10%;
+
+    /* Deep Forest - Primary Actions & Headings */
+    --primary: 156 31% 14%;          /* #1a2f25 - Deep Forest */
+    --primary-foreground: 42 30% 96%; /* Ivory text on primary */
+
+    /* Antique Gold - Secondary Accents */
+    --secondary: 45 70% 45%;         /* #c9a03d - Antique Gold */
+    --secondary-foreground: 42 30% 96%;
+
+    /* Sand - Subtle Muted Elements */
+    --muted: 40 20% 92%;             /* #e8dfd0 - Sand */
+    --muted-foreground: 100 5% 28%;  /* #424844 - Ink Secondary */
+
+    /* Warm Grey - Accent Alternatives */
+    --accent: 100 5% 88%;            /* #e4e2de - Surface Container Highest */
+    --accent-foreground: 100 3% 10%;
+
+    /* Islamic Green - Tertiary / Success */
+    --destructive: 0 84% 50%;        /* Error red */
+    --destructive-foreground: 42 30% 96%;
+
+    /* Borders & Outlines */
+    --border: 100 5% 76%;            /* #c2c8c3 - Outline Variant */
+    --input: 100 5% 76%;
+    --ring: 156 31% 14%;             /* Deep Forest focus ring */
+
+    /* Sacred Editorial Specific Tokens */
+    --surface-dim: 40 10% 85%;       /* #dbdad6 */
+    --surface-bright: 42 30% 96%;    /* #fbf9f5 */
+    --surface-container: 60 5% 93%;  /* #efeeea */
+    --surface-container-high: 60 5% 91%; /* #eae8e4 */
+    --inverse-surface: 100 3% 18%;   /* #30312e */
+    --inverse-on-surface: 42 30% 96%;
+    --outline-variant: 100 5% 76%;   /* #c2c8c3 */
+    --surface-tint: 156 20% 35%;     /* #4f6358 */
+
+    /* Typography Scale */
+    --radius: 0.25rem;               /* 4px - Consistent with system */
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+
+    /* Spacing & Layout */
     --navbar-height-mobile: 56px;
-  --navbar-height-tablet: 64px;
-  --navbar-height-desktop: 112px;
+    --navbar-height-tablet: 64px;
+    --navbar-height-desktop: 112px;
+    --section-padding: 120px;
+    --max-width: 1280px;
+    --gutter: 32px;
+    --margin: 64px;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* Dark Mode - Inverse Surface */
+    --background: 100 3% 18%;        /* #30312e - Inverse Surface */
+    --foreground: 42 30% 96%;        /* #fbf9f5 - Ivory */
+
+    --card: 156 31% 10%;             /* Darker forest base */
+    --card-foreground: 42 30% 96%;
+
+    --popover: 156 31% 10%;
+    --popover-foreground: 42 30% 96%;
+
+    --primary: 156 25% 75%;          /* #b6cbbf - Inverse Primary */
+    --primary-foreground: 156 31% 14%;
+
+    --secondary: 45 70% 45%;         /* Antique Gold maintained */
+    --secondary-foreground: 42 30% 96%;
+
+    --muted: 156 20% 25%;
+    --muted-foreground: 100 5% 76%;
+
+    --accent: 156 20% 25%;
+    --accent-foreground: 42 30% 96%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 42 30% 96%;
+
+    --border: 156 20% 25%;
+    --input: 156 20% 25%;
+    --ring: 156 25% 75%;
   }
 
-  /* Instead of @apply border-border */
+  /* Border color utility */
   * {
     border-color: hsl(var(--border));
+    @apply border-border outline-ring/50;
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    @apply bg-background text-foreground;
+  }
+
+  /* Typography Classes for Sacred Editorial */
+  .font-serif {
+    font-family: 'Noto Serif', 'Times New Roman', serif;
+  }
+
+  .font-arabic {
+    font-family: 'Amiri', 'Noto Naskh Arabic', serif;
+  }
+
+  /* Heading Styles */
+  h1, .display-xl {
+    font-family: 'Noto Serif', serif;
+    font-size: 72px;
+    font-weight: 400;
+    line-height: 1.167;  /* 84px */
+    letter-spacing: -0.02em;
+  }
+
+  h2, .headline-lg {
+    font-family: 'Noto Serif', serif;
+    font-size: 48px;
+    font-weight: 400;
+    line-height: 1.167;  /* 56px */
+  }
+
+  h3, .headline-md {
+    font-family: 'Noto Serif', serif;
+    font-size: 32px;
+    font-weight: 400;
+    line-height: 1.25;   /* 40px */
+  }
+
+  /* Body Text */
+  .body-lg {
+    font-family: 'Manrope', sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.778;  /* 32px */
+  }
+
+  .body-md {
+    font-family: 'Manrope', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.75;   /* 28px */
+  }
+
+  /* Caps Labels */
+  .label-caps {
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.333;  /* 16px */
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Arabic Text */
+  .arabic-display {
+    font-family: 'Amiri', serif;
+    font-size: 40px;
+    font-weight: 400;
+    line-height: 1.5;    /* 60px */
+  }
+  html {
+    @apply font-sans;
   }
 }
 
-button{
+/* Interactive Elements */
+button {
   cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  transition: all 0.2s ease;
 }
 
+/* Sacred Editorial Button Variants */
+.btn-primary {
+  background-color: hsl(156, 31%, 14%);  /* Deep Forest */
+  color: hsl(42, 30%, 96%);              /* Ivory */
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-weight: 500;
+}
 
+.btn-primary:hover {
+  background-color: hsl(156, 31%, 10%);  /* Darker forest */
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: hsl(156, 31%, 14%);             /* Deep Forest */
+  border: 1px solid hsl(156, 31%, 14%);
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background-color: hsl(40, 20%, 92%);   /* Sand tint */
+}
+
+/* Gold accent elements */
+.gold-rule {
+  height: 1px;
+  background-color: hsl(45, 70%, 45%);   /* Antique Gold */
+  width: 100%;
+}
+
+.gold-rule-thin {
+  height: 0.5px;
+  background-color: hsl(45, 70%, 45%);
+}
+
+/* Layout Utilities */
+.section-padding {
+  padding-top: var(--section-padding);
+  padding-bottom: var(--section-padding);
+}
+
+.container-sacred {
+  max-width: var(--max-width);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* Grid System */
+.grid-sacred {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--gutter);
+}
+
+/* Reset & Overflow */
 html, body {
   width: 100%;
   max-width: 100%;
@@ -78,4 +262,133 @@ section, div {
   box-sizing: border-box;
 }
 
+/* Custom Scrollbar - Editorial Style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
+::-webkit-scrollbar-track {
+  background: hsl(40, 20%, 92%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(156, 31%, 14%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(45, 70%, 45%);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
