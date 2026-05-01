@@ -48,7 +48,7 @@ const contactInfo = [
   {
     icon: MapPin,
     label: 'Location',
-    value: 'Lahore, Punjab, Pakistan',
+    value: 'Faisalabad, Punjab, Pakistan',
     href: '#map',
   },
   {
