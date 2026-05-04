@@ -424,7 +424,7 @@ export default function ParticipationForm({ onSuccess, bankAccount }: Props) {
                     >
                       {cat.remainingSeats <= 5
                         ? `⚡ Only ${cat.remainingSeats} left`
-                        : `${cat.remainingSeats} seats available`}
+                        : `${cat.remainingSeats} shares available`}
                     </p>
                   )}
                 </div>
