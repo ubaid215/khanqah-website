@@ -124,9 +124,10 @@ export default function ParticipationForm({ onSuccess, bankAccount }: Props) {
     if (!form.fillerName.trim() || form.fillerName.trim().length < 2)
       e.fillerName = "Full name is required (min 2 characters)";
 
-    if (!/^(\+92|0)?3[0-9]{9}$/.test(form.fillerPhone.trim()))
+    const digitsOnly = form.fillerPhone.trim().replace(/[\s\-()+]/g, "");
+    if (!/^\d{7,15}$/.test(digitsOnly))
       e.fillerPhone =
-        "Enter a valid Pakistani mobile number (e.g. 03001234567)";
+        "Enter a valid phone number (e.g. +1 555 0123 or 03001234567)";
 
     if (
       form.fillerEmail &&
@@ -495,9 +496,9 @@ export default function ParticipationForm({ onSuccess, bankAccount }: Props) {
             error={errors.fillerName}
           />
           <Field
-            label="Mobile Number"
-            urdu="موبائل نمبر"
-            placeholder="03001234567"
+            label="Phone Number"
+            urdu="فون نمبر"
+            placeholder="+1 555 0123 or 03001234567"
             value={form.fillerPhone}
             onChange={(v) => {
               setForm((f) => ({ ...f, fillerPhone: v }));
