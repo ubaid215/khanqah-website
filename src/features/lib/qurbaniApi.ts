@@ -53,6 +53,7 @@ export interface SubmitParticipationPayload {
 
 export interface SubmitParticipationResult {
   id:               string
+  refNumber:        number
   fillerName:       string
   fillerPhone:      string
   category:         AnimalCategory

@@ -69,7 +69,7 @@ export default function StatusChecker({ prefillId }: Props) {
       {/* ── Search ────────────────────────────────────────────────────────── */}
       <div>
         <h2 className="text-xl font-bold text-stone-800 mb-1">Check Your Status</h2>
-        <p className="text-stone-500 text-sm">Enter your registration ID to view your booking status.</p>
+        <p className="text-stone-500 text-sm">Enter your reference number to view your booking status.</p>
       </div>
 
       <form onSubmit={handleSearch} className="flex gap-2">
@@ -77,7 +77,7 @@ export default function StatusChecker({ prefillId }: Props) {
           type="text"
           value={id}
           onChange={e => setId(e.target.value)}
-          placeholder="Paste your registration ID here..."
+          placeholder="Enter your reference number (e.g. 42)..."
           className="flex-1 px-3.5 py-2.5 rounded-xl border border-stone-200 text-sm outline-none
             focus:border-[#2c5f2e] focus:ring-2 focus:ring-[#2c5f2e]/20 bg-white transition-colors font-mono"
         />

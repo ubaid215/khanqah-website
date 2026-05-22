@@ -18,8 +18,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
 export default function SubmissionSuccess({ submission, onCheckStatus, onNewSubmission }: Props) {
   const [copied, setCopied] = useState(false)
 
-  const copyId = () => {
-    navigator.clipboard.writeText(submission.id).then(() => {
+  const copyRef = () => {
+    navigator.clipboard.writeText(String(submission.refNumber)).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -42,17 +42,17 @@ export default function SubmissionSuccess({ submission, onCheckStatus, onNewSubm
         </p>
       </div>
 
-      {/* ── Reference ID ─────────────────────────────────────────────────── */}
+      {/* ── Reference Number ──────────────────────────────────────────────── */}
       <div className="bg-[#111f12] rounded-2xl p-5">
-        <p className="text-[#6b9b6d] text-xs font-medium uppercase tracking-wider mb-2">Your Reference ID</p>
+        <p className="text-[#6b9b6d] text-xs font-medium uppercase tracking-wider mb-2">Your Reference Number</p>
         <div className="flex items-center gap-3">
-          <code className="flex-1 text-white font-mono text-sm bg-[#1e3a20] rounded-lg px-3 py-2 break-all">
-            {submission.id}
+          <code className="flex-1 text-white font-mono text-3xl font-bold bg-[#1e3a20] rounded-lg px-4 py-3 tracking-widest text-center">
+            #{submission.refNumber}
           </code>
           <button
-            onClick={copyId}
+            onClick={copyRef}
             className="p-2 text-[#5a8c5c] hover:text-white hover:bg-[#2c5f2e] rounded-lg transition-colors flex-shrink-0"
-            title="Copy ID"
+            title="Copy reference number"
           >
             {copied
               ? <CheckCircle2 size={15} className="text-emerald-400" />
@@ -61,7 +61,7 @@ export default function SubmissionSuccess({ submission, onCheckStatus, onNewSubm
           </button>
         </div>
         <p className="text-[#5a8c5c] text-xs mt-2">
-          💡 Save this ID to track your booking status anytime
+          💡 Save this number to check your booking status anytime
         </p>
       </div>
 
@@ -92,11 +92,12 @@ export default function SubmissionSuccess({ submission, onCheckStatus, onNewSubm
           <p className="font-semibold text-stone-700 text-sm">Booking Summary</p>
         </div>
         <div className="p-5 space-y-3 text-sm">
-          <InfoRow label="Name"         value={submission.fillerName} />
-          <InfoRow label="Phone"        value={submission.fillerPhone} />
-          <InfoRow label="Category"     value={`${CATEGORY_EMOJI[submission.category] ?? ''} ${submission.category}`} />
-          <InfoRow label="Payment Mode" value={submission.paymentMode === 'FULL' ? 'Full Payment' : 'Installments'} />
-          <InfoRow label="Participants" value={submission.participantCount.toString()} />
+          <InfoRow label="Reference #"    value={`#${submission.refNumber}`} />
+          <InfoRow label="Name"           value={submission.fillerName} />
+          <InfoRow label="Phone"          value={submission.fillerPhone} />
+          <InfoRow label="Category"       value={`${CATEGORY_EMOJI[submission.category] ?? ''} ${submission.category}`} />
+          <InfoRow label="Payment Mode"   value={submission.paymentMode === 'FULL' ? 'Full Payment' : 'Installments'} />
+          <InfoRow label="Participants"   value={submission.participantCount.toString()} />
           <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
             <span className="font-semibold text-stone-700">Total Amount</span>
             <span className="text-xl font-bold text-[#2c5f2e]">Rs {submission.totalAmount.toLocaleString()}</span>

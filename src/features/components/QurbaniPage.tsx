@@ -102,7 +102,7 @@ export default function QurbaniPage() {
         )}
 
         {view === 'status' && (
-          <StatusChecker prefillId={submission?.id} />
+          <StatusChecker prefillId={submission?.refNumber?.toString()} />
         )}
       </main>
 
