@@ -48,16 +48,6 @@ const heroSlides = [
     ctaSecondary: { label: "Publications", href: "/resources/publications" },
     arabicCalligraphy: "العلوم الإسلامية",
   },
-  {
-  id: 5,
-  title: "Fulfill Your Qurbani with Trust",
-  subtitle: "Serve humanity. Uphold the Sunnah of sacrifice",
-  description: "شارك في القرباني هذا العام من خلال خانقاه سيفية. Ensure your sacrifice reaches the deserving with transparency, care, and spiritual integrity.",
-  image: "/images/hero/qurbani.png",
-  ctaPrimary: { label: "Participate in Qurbani", href: "/qurbani" },
-  ctaSecondary: { label: "Learn How It Works", href: "/qurbani" },
-  arabicCalligraphy: "شعيرة الأضحية",
-}
 ];
 
 // ─── Navigation Dots ──────────────────────────────────────────────────────────
@@ -144,7 +134,7 @@ const Hero = () => {
 
   return (
     <section
-      className="relative w-full h-svh min-h-[560px] overflow-hidden bg-[hsl(100,3%,10%)]"
+      className="relative w-full -mt-[56px] sm:-mt-[64px] lg:-mt-[112px] h-[calc(58vw+56px)] min-h-[320px] sm:h-svh sm:min-h-[560px] [@media(max-height:500px)]:min-h-0 overflow-hidden bg-[hsl(100,3%,10%)]"
       onMouseEnter={() => setIsAutoPlaying(false)}
       onMouseLeave={() => setIsAutoPlaying(true)}
     >
@@ -183,11 +173,11 @@ const Hero = () => {
       </div>
 
       {/* ── Main content ── */}
-      <div className="relative z-20 h-full container-sacred flex items-center">
+      <div className="relative z-20 h-full container-sacred flex items-end sm:items-center pb-14 sm:pb-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
-            className="w-full max-w-[90%] sm:max-w-[75%] lg:max-w-3xl text-white pt-[56px] sm:pt-[64px] lg:pt-[80px]"
+            className="w-full max-w-[90%] sm:max-w-[75%] lg:max-w-3xl text-white pt-0 sm:pt-[80px] lg:pt-[96px]"
           >
             {/* Arabic calligraphy */}
             <motion.div
@@ -195,7 +185,7 @@ const Hero = () => {
               initial="hidden"
               animate="visible"
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0 }}
-              className="mb-3 sm:mb-5"
+              className="mb-3 sm:mb-5 hidden sm:block"
             >
               <span className="font-arabic text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-[hsl(45,70%,45%)] opacity-90 leading-relaxed">
                 {slide.arabicCalligraphy}
@@ -209,7 +199,7 @@ const Hero = () => {
               initial="hidden"
               animate="visible"
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-              className="text-[10px] sm:text-[11px] md:text-xs font-bold tracking-[0.12em] uppercase text-[hsl(45,70%,55%)] mb-3 sm:mb-4"
+              className="text-[10px] sm:text-[11px] md:text-xs font-bold tracking-[0.12em] uppercase text-[hsl(45,70%,55%)] mb-1.5 sm:mb-4"
             >
               {slide.subtitle}
             </motion.p>
@@ -220,8 +210,8 @@ const Hero = () => {
               initial="hidden"
               animate="visible"
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.25 }}
-              className="font-serif font-normal leading-[1.15] mb-3 sm:mb-5
-                text-[28px]
+              className="font-serif font-normal leading-[1.15] mb-2 sm:mb-5
+                text-[22px]
                 sm:text-[38px]
                 md:text-[50px]
                 lg:text-[62px]
@@ -237,7 +227,7 @@ const Hero = () => {
               animate="visible"
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.38 }}
               className="leading-relaxed text-white/75 mb-6 sm:mb-8
-                text-[13px] max-w-[280px]
+                hidden sm:block
                 sm:text-[15px] sm:max-w-sm
                 md:text-base md:max-w-md
                 lg:text-lg lg:max-w-xl"
@@ -251,7 +241,7 @@ const Hero = () => {
               initial="hidden"
               animate="visible"
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
-              className="flex flex-wrap gap-2.5 sm:gap-3"
+              className="flex flex-wrap gap-2.5 sm:gap-3 [@media(max-height:500px)]:gap-2"
             >
               <Link href={slide.ctaPrimary.href}>
                 <motion.button
@@ -263,6 +253,7 @@ const Hero = () => {
                     "sm:text-[11px] sm:px-5 sm:py-3",
                     "md:text-xs md:px-6 md:py-3",
                     "lg:px-7 lg:py-3.5",
+                    "[@media(max-height:500px)]:px-3 [@media(max-height:500px)]:py-2 [@media(max-height:500px)]:text-[9px]",
                     "hover:bg-[hsl(45,70%,50%)] transition-colors duration-200 shadow-md"
                   )}
                 >
@@ -280,6 +271,7 @@ const Hero = () => {
                     "sm:text-[11px] sm:px-5 sm:py-3",
                     "md:text-xs md:px-6 md:py-3",
                     "lg:px-7 lg:py-3.5",
+                    "[@media(max-height:500px)]:px-3 [@media(max-height:500px)]:py-2 [@media(max-height:500px)]:text-[9px]",
                     "hover:bg-white/10 hover:border-white/80 transition-all duration-200"
                   )}
                 >
@@ -292,7 +284,7 @@ const Hero = () => {
       </div>
 
       {/* ── Bottom bar: dots + arrows ── */}
-      <div className="absolute bottom-5 sm:bottom-7 left-0 right-0 z-30 container-sacred flex items-center justify-between">
+      <div className="absolute bottom-2.5 sm:bottom-7 left-0 right-0 z-30 container-sacred flex items-center justify-between">
         {/* Dots */}
         <NavigationDots
           total={heroSlides.length}

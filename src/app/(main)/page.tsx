@@ -7,6 +7,7 @@ import PrayerTimesSection from '@/components/home/PrayerTimesSection';
 import CurriculumSection from '@/components/home/CurriculumSection';
 import HadithSlider from '@/components/home/HadithSlider';
 import CTASection from '@/components/home/CTASection';
+import QurbaniVideoSection from '@/components/home/QurbaniVideoSection';
 
 const Homepage = () => {
 
@@ -23,6 +24,9 @@ const Homepage = () => {
 
       {/* Five Pillars of Islam Section */}
       <PillarsSection/>
+
+      {/* Qurbani Distribution Videos */}
+      <QurbaniVideoSection/>
 
       {/* Programs Section */}
       <CurriculumSection/>
