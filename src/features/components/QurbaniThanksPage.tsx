@@ -243,7 +243,7 @@ export default function QurbaniThanksPage() {
   const pageFadeUp = (delay = 0, inView = true) => ({
     initial: { opacity: 0, y: 22 },
     animate: inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 22 },
-    transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] as number[], delay },
+    transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] as [number, number, number, number], delay },
   })
 
   const cornerLines = [
