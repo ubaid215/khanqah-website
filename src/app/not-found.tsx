@@ -75,6 +75,20 @@ const Lantern = () => (
   </svg>
 );
 
+// ─── Subtle animated dots ─────────────────────────────────────────────────────
+const WorkingDots = () => (
+  <span className="inline-flex items-center gap-[5px] ml-1 translate-y-[-2px]">
+    {[0, 0.2, 0.4].map((delay, i) => (
+      <motion.span
+        key={i}
+        className="block w-[5px] h-[5px] rounded-full bg-[hsl(45,70%,45%)]"
+        animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+        transition={{ duration: 1.4, repeat: Infinity, delay, ease: "easeInOut" }}
+      />
+    ))}
+  </span>
+);
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NotFound() {
   return (
@@ -101,10 +115,10 @@ export default function NotFound() {
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-0 overflow-hidden select-none">
         <span
           className="font-arabic leading-none text-[hsl(42,30%,96%)] opacity-[0.025]"
-          style={{ fontSize: "clamp(100px, 25vw, 280px)" }}
+          style={{ fontSize: "clamp(80px, 20vw, 220px)" }}
           aria-hidden
         >
-          غير موجود
+          قيد الإنشاء
         </span>
       </div>
 
@@ -124,54 +138,46 @@ export default function NotFound() {
           <Lantern />
         </motion.div>
 
-        {/* 404 number */}
+        {/* "Coming Soon" badge */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="relative inline-block mb-4"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full border border-[hsl(45,70%,45%)]/30 bg-[hsl(45,70%,45%)]/8"
         >
-          <span
-            className="font-serif font-normal text-[hsl(42,30%,96%)] leading-none select-none"
-            style={{ fontSize: "clamp(72px, 18vw, 140px)" }}
-          >
-            404
+          <span className="w-1.5 h-1.5 rounded-full bg-[hsl(45,70%,55%)] animate-pulse" />
+          <span className="text-[10px] font-bold tracking-[0.18em] uppercase text-[hsl(45,70%,55%)]">
+            Page Coming Soon
           </span>
-          {/* Gold underline */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
-            className="absolute bottom-2 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[hsl(45,70%,45%)] to-transparent origin-center"
-          />
         </motion.div>
+
+        {/* Heading */}
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          className="font-serif font-normal text-[hsl(42,30%,94%)] leading-[1.25] mb-3"
+          style={{ fontSize: "clamp(26px, 5vw, 42px)" }}
+        >
+          We&rsquo;re working on this page
+          <WorkingDots />
+        </motion.h1>
 
         {/* Arabic subtitle */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="font-arabic text-xl sm:text-2xl text-[hsl(45,70%,50%)] mb-3 leading-relaxed"
+          className="font-arabic text-lg sm:text-xl text-[hsl(45,70%,45%)] mb-5 leading-relaxed"
         >
-          الصفحة غير موجودة
+          هذه الصفحة قيد الإنشاء
         </motion.p>
-
-        {/* Heading */}
-        <motion.h1
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1], delay: 0.35 }}
-          className="font-serif font-normal text-[hsl(42,30%,92%)] leading-[1.2] mb-4"
-          style={{ fontSize: "clamp(22px, 4vw, 34px)" }}
-        >
-          This page has wandered off the path
-        </motion.h1>
 
         {/* Divider */}
         <motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
           className="w-12 h-px bg-[hsl(45,70%,45%)] mx-auto mb-5 origin-center"
         />
 
@@ -180,9 +186,9 @@ export default function NotFound() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="text-[14px] sm:text-[15px] leading-relaxed text-[hsl(42,30%,96%)]/50 max-w-md mx-auto mb-10"
+          className="text-[14px] sm:text-[15px] leading-relaxed text-[hsl(42,30%,96%)]/50 max-w-sm mx-auto mb-10"
         >
-          The page you are looking for may have been moved, renamed, or does not exist. Let us guide you back.
+          This page is currently being prepared. Please check back soon — in the meantime, let us guide you somewhere useful.
         </motion.p>
 
         {/* CTA */}
@@ -225,7 +231,7 @@ export default function NotFound() {
             Or explore
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-            {links.map((link, i) => (
+            {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
